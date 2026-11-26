@@ -15,7 +15,7 @@ async function start() {
     app.innerHTML = `<div class="card pad center narrow"><div class="big-emoji">🏗️</div><h2>Noch keine Räume angelegt</h2><p class="muted">Die Direktion richtet den Raumplan gerade ein.</p></div>`;
     return;
   }
-  app.innerHTML = `<div id="scene"></div><div class="grid2 below" id="below"></div>`;
+  app.innerHTML = `<div id="scene"></div><details class="card pad more below" id="moreBox"><summary>Listen anzeigen (freie Räume, wo ist welche Klasse, Änderungen)</summary><div class="grid2" id="below" style="margin-top:.8rem"></div></details>`;
   scene = await mountScene($("#scene"), store, { onSel: renderBelow });
   renderBelow(scene.sel);
 }

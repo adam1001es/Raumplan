@@ -350,3 +350,24 @@ details.more > summary::before { content: "▸ "; } details.more[open] > summary
 .cell.busy { background: var(--soft); color: var(--ink); font-weight: 600; }
 .where, .where.away { background: var(--soft); } .where b { color: var(--ink); }
 .util-row .b i { background: #8b97ab; }
+
+/* ── Übersicht als Etagen-Grundrisse ─────────────────────────── */
+.s3d.plan { height: auto; min-height: 0; overflow: visible; touch-action: pan-y; border-radius: 18px; padding-bottom: .2rem; }
+.s3d.plan .s3d-canvas { position: relative; width: 100%; }
+.s3d.plan .s3d-canvas canvas { position: absolute; inset: 0; }
+.s3d.plan .s3d-hud { position: static; display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .7rem .9rem .3rem; }
+.s3d.plan .s3d-hud .when { display: flex; align-items: center; gap: .4rem; font-size: .92rem; padding: 0; flex-wrap: wrap; }
+.s3d.plan .s3d-hud .when .muted { font-size: .8rem; }
+.s3d.plan .s3d-hud .free { border: 0; padding: 0; font-size: .9rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.s3d.plan .s3d-hud .free b { font-size: 1.5rem; color: var(--free); font-weight: 900; margin-right: .15rem; }
+.s3d.plan .now-btn { padding: .15rem .55rem; font-size: .72rem; border-radius: 7px; }
+.s3d.plan .s3d-bottom { position: sticky; left: auto; right: auto; bottom: calc(8px + env(safe-area-inset-bottom)); margin: .4rem .5rem .3rem; z-index: 20; }
+.s3d-info { position: fixed; left: 10px; right: 10px; bottom: calc(118px + env(safe-area-inset-bottom)); width: auto; max-width: 440px; margin: 0 auto; z-index: 40; }
+.p3d-lbl { pointer-events: none; display: flex; flex-direction: column; align-items: center; line-height: 1.05; text-shadow: 0 0 3px var(--card), 0 0 3px var(--card); transform: translateY(-2px); }
+.p3d-lbl b { font-size: 10px; font-weight: 800; color: var(--ink); white-space: nowrap; }
+.p3d-lbl.k-busy b, .p3d-lbl.k-conflict b { font-size: 11px; }
+.p3d-lbl span { font-size: 9px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.p3d-lbl.k-free span { color: #15803d; } .p3d-lbl.k-emerg span { color: #15803d; opacity: .7; } .p3d-lbl.k-conflict span { color: var(--alert); }
+.p3d-lbl.sel b { color: var(--accent); }
+.p3d-floor { font-size: 11px; font-weight: 800; color: var(--muted); pointer-events: none; white-space: nowrap; }
+@media (min-width: 900px) { .p3d-lbl b { font-size: 11px; } .p3d-lbl span { font-size: 10.5px; } .p3d-floor { font-size: 13px; } }

@@ -1,7 +1,8 @@
-// Live-3D-Übersicht mit schlanken Bedienelementen (Stockwerk, Tag, Einheit, Abspielen, Raum-Info).
+// Live-Übersicht: Etagen-Grundrisse untereinander, schlanke Kopfzeile, Einheiten-Leiste unten.
 
 import { h, $, $$ } from "./ui.js";
-import { createBuilding, FLOOR_NAMES, roomPlace, setFloorNames } from "./building3d.js";
+import { FLOOR_NAMES, roomPlace, setFloorNames } from "./building3d.js";
+import { createPlan } from "./plan3d.js";
 import { isoDate, parseIso, addDays, mondayOf, weekday, fmtDate, DAY_SHORT, DAY_NAMES, schoolToday, currentPeriod, slotState, byId } from "./model.js";
 
 // Bewusst wenige Farben: grün = frei, grau = besetzt.
@@ -30,56 +31,33 @@ export function roomStates(data, iso, period) {
 
 /** host: Element. opts: { canEdit(), onEdit(roomId, iso, period), onSel(sel) } */
 export async function mountScene(host, store, opts = {}) {
-  const sel = { iso: null, period: null, follow: true, floor: null, exploded: true, playing: null, room: null };
+  const sel = { iso: null, period: null, follow: true, playing: null, room: null };
   setFloorNames(store.data.settings.stockNamen);
   syncNow();
   host.innerHTML = `
-    <div class="s3d">
+    <div class="s3d plan">
+      <div class="s3d-hud"><div class="when"></div><div class="free"></div></div>
       <div class="s3d-canvas"></div>
-      <div class="s3d-hud glass">
-        <div class="when"></div>
-        <div class="free"></div>
-      </div>
-      <div class="s3d-rail">
-        <div class="glass floors"></div>
-        <div class="glass tools">
-          <button data-t="up" title="Stockwerk höher">▲</button>
-          <button data-t="down" title="Stockwerk tiefer">▼</button>
-          <button data-t="reset" title="Ganzes Gebäude">⌂</button>
-        </div>
-      </div>
-      <div class="s3d-info glass" hidden></div>
       <div class="s3d-bottom glass">
         <div class="days"></div>
         <div class="tl"><button class="play" title="Tag abspielen">▶</button><div class="pers"></div></div>
       </div>
     </div>
-    <div class="legend s3d-legend">
-      <span><i style="background:${KIND_COLORS.free}"></i>frei</span><span><i style="background:${KIND_COLORS.emerg}"></i>frei (nur zur Not)</span>
-      <span><i style="background:${KIND_COLORS.busy}"></i>besetzt</span><span class="hint">Raum antippen für Details</span>
-    </div>`;
-  const s3d = $(".s3d", host);
+    <div class="s3d-info glass" hidden></div>`;
   let b;
   try {
-    b = await createBuilding($(".s3d-canvas", host), store.data.rooms, { gebaeude: store.data.settings.gebaeude || [], onSelect: (id) => { sel.room = id; b.select(id); renderInfo(); },
-      onFloorPick: (stock) => { sel.floor = stock; b.setFloor(stock); renderControls(); refresh(); hint(); } });
+    b = await createPlan($(".s3d-canvas", host), store.data.rooms, { gebaeude: store.data.settings.gebaeude || [], onSelect: (id) => { sel.room = id; b.select(id); renderInfo(); } });
   } catch (e) {
     $(".s3d-canvas", host).innerHTML = `<div class="s3d-fallback">3D wird von diesem Gerät nicht unterstützt (${h(e.message)}).</div>`;
     return { sel, refresh() {}, tick() {}, setSel() {} };
   }
-  let roomSig = sig(store.data.rooms) + "#" + store.data.settings.periods.map((p) => p.nr).join(",");
-  function sig(rooms) { return rooms.map((r) => [r.id, r.name, r.stock, r.trakt, r.groesse, r.typ, r.bereich, r.sort, r.seite].join("|")).join(";") + JSON.stringify(store.data.settings.gebaeude || []) + JSON.stringify(store.data.settings.stockNamen || {}); }
+  const sig = () => store.data.rooms.map((r) => [r.id, r.name, r.stock, r.trakt, r.groesse, r.typ, r.sort, r.seite].join("|")).join(";") + JSON.stringify(store.data.settings.gebaeude || []) + JSON.stringify(store.data.settings.stockNamen || {}) + store.data.settings.periods.map((p) => p.nr).join(",");
+  let roomSig = sig();
   function syncNow() {
     const now = new Date(); const today = schoolToday(now); const isToday = isoDate(today) === isoDate(now);
     const cp = currentPeriod(store.data.settings.periods, now);
     if (isToday && cp.status !== "nach") { sel.iso = isoDate(today); sel.period = cp.nr; }
     else { sel.iso = isoDate(isToday ? schoolToday(addDays(now, 1)) : today); sel.period = store.data.settings.periods[0]?.nr || 1; }
-  }
-  function hint() {
-    const old = $(".s3d-toast", host); if (old) old.remove();
-    const t = document.createElement("div"); t.className = "s3d-toast";
-    t.textContent = sel.floor === null ? "Stockwerk antippen, um es groß zu sehen" : `${FLOOR_NAMES(sel.floor)} · Raum antippen für Details`;
-    s3d.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
   const stopPlay = () => { if (sel.playing) { clearInterval(sel.playing); sel.playing = null; $(".play", host).textContent = "▶"; } };
 
@@ -149,8 +127,8 @@ export async function mountScene(host, store, opts = {}) {
   function refresh() {
     const d = store.data;
     if (!d.rooms.length) return;
-    const s2 = sig(d.rooms) + "#" + d.settings.periods.map((p) => p.nr).join(",");
-    if (s2 !== roomSig) { roomSig = s2; setFloorNames(d.settings.stockNamen); b.rebuild(d.rooms, d.settings.gebaeude || []); b.setFloor(sel.floor); b.setExploded(sel.exploded); renderControls(); }
+    const s2 = sig();
+    if (s2 !== roomSig) { roomSig = s2; setFloorNames(d.settings.stockNamen); b.rebuild(d.rooms, d.settings.gebaeude || []); renderControls(); }
     const states = roomStates(d, sel.iso, sel.period);
     b.update(states);
     const now = new Date(); const date = parseIso(sel.iso);
@@ -159,13 +137,9 @@ export async function mountScene(host, store, opts = {}) {
     const per = d.settings.periods.find((p) => p.nr === sel.period);
     const regular = d.rooms.filter((r) => !r.notnutzung && !["Verwaltung", "Nebenraum"].includes(r.typ));
     const free = regular.filter((r) => states.get(r.id).kind === "free").length;
-    const emerg = d.rooms.filter((r) => states.get(r.id).kind === "emerg").length;
-    $(".when", host).innerHTML = `
-      <div class="lv">${isNow ? `<span class="live-dot"></span>Live` : sel.playing ? "▶ Tagesablauf" : sel.iso === isoDate(now) ? "Heute" : DAY_NAMES[weekday(date)]}${!sel.follow && !sel.playing ? `<button class="now-btn">Jetzt</button>` : ""}</div>
-      <div class="dt">${DAY_SHORT[weekday(date)]} ${fmtDate(date)} · <b>${sel.period}. EH</b></div>
-      <div class="tm">${per ? `${per.start}–${per.end}` : ""}</div>`;
+    $(".when", host).innerHTML = `${isNow ? `<span class="live-dot"></span>` : ""}<b>${DAY_SHORT[weekday(date)]} ${fmtDate(date)} · ${sel.period}. EH</b> <span class="muted">${per ? `${per.start}–${per.end}` : ""}</span>${!sel.follow && !sel.playing ? ` <button class="now-btn">Jetzt</button>` : ""}`;
     $(".now-btn", host)?.addEventListener("click", () => { stopPlay(); sel.follow = true; syncNow(); refresh(); });
-    $(".free", host).innerHTML = `<div class="big">${free}</div><div class="sm">frei${emerg ? `<br>+${emerg} zur Not` : ""}</div>`;
+    $(".free", host).innerHTML = `<b>${free}</b> frei`;
     $$(".pers button", host).forEach((x) => {
       const p = +x.dataset.p; x.classList.toggle("on", p === sel.period);
       const ss = roomStates(d, sel.iso, p);
@@ -180,10 +154,8 @@ export async function mountScene(host, store, opts = {}) {
 
   function renderControls() {
     const d = store.data;
-    $(".floors", host).innerHTML = [`<button data-f="" class="${sel.floor === null ? "on" : ""}">Alle</button>`, ...[...b.floors()].reverse().map((f) => `<button data-f="${f}" class="${sel.floor === f ? "on" : ""}">${FLOOR_NAMES(f)}</button>`)].join("");
-    $$(".floors button", host).forEach((x) => x.onclick = () => { sel.floor = x.dataset.f === "" ? null : +x.dataset.f; sel.room = null; b.select(null); $(".s3d-info", host).hidden = true; b.setFloor(sel.floor); renderControls(); refresh(); hint(); });
     const mon = mondayOf(schoolToday());
-    $(".days", host).innerHTML = [1, 2, 3, 4, 5].map((wd) => { const dd = addDays(mon, wd - 1); return `<button data-iso="${isoDate(dd)}" class="${isoDate(dd) === sel.iso ? "on" : ""}">${DAY_SHORT[wd]} <small>${fmtDate(dd)}</small></button>`; }).join("");
+    $(".days", host).innerHTML = [1, 2, 3, 4, 5].map((wd) => { const dd = addDays(mon, wd - 1); return `<button data-iso="${isoDate(dd)}">${DAY_SHORT[wd]} <small>${fmtDate(dd)}</small></button>`; }).join("");
     $$(".days button", host).forEach((x) => x.onclick = () => { stopPlay(); sel.iso = x.dataset.iso; sel.follow = false; refresh(); });
     $(".pers", host).innerHTML = d.settings.periods.map((p) => `<button data-p="${p.nr}"><span>${p.nr}</span></button>`).join("");
     $$(".pers button", host).forEach((x) => x.onclick = () => { stopPlay(); sel.period = +x.dataset.p; sel.follow = false; refresh(); });
@@ -197,20 +169,9 @@ export async function mountScene(host, store, opts = {}) {
     const step = () => { i++; if (i >= ps.length) { stopPlay(); refresh(); return; } sel.period = ps[i]; refresh(); };
     $(".play", host).textContent = "⏸"; sel.playing = setInterval(step, 1500); step();
   };
-  $$(".tools button", host).forEach((x) => x.onclick = () => {
-    const t = x.dataset.t;
-    if (t === "up" || t === "down") {
-      const fl = b.floors(); let i = sel.floor === null ? (t === "up" ? -1 : fl.length) : fl.indexOf(sel.floor);
-      i = Math.max(0, Math.min(fl.length - 1, i + (t === "up" ? 1 : -1)));
-      sel.floor = fl[i]; sel.room = null; b.select(null); $(".s3d-info", host).hidden = true; b.setFloor(sel.floor); hint();
-    }
-    if (t === "reset") { sel.floor = null; sel.room = null; b.select(null); $(".s3d-info", host).hidden = true; b.setFloor(null); hint(); }
-    renderControls(); refresh();
-  });
 
   renderControls();
   refresh();
-  setTimeout(hint, 1600);
   return {
     sel,
     refresh() { refresh(); },
