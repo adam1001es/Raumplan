@@ -1,12 +1,12 @@
 // Live-3D-Übersicht mit schlanken Bedienelementen (Stockwerk, Tag, Einheit, Abspielen, Raum-Info).
 
 import { h, $, $$ } from "./ui.js";
-import { createBuilding, FLOOR_NAMES, roomPlace } from "./building3d.js";
+import { createBuilding, FLOOR_NAMES, roomPlace, setFloorNames } from "./building3d.js";
 import { isoDate, parseIso, addDays, mondayOf, weekday, fmtDate, DAY_SHORT, DAY_NAMES, schoolToday, currentPeriod, slotState, byId } from "./model.js";
 
 export const KIND_COLORS = {
   NMS: "#3b6cf6", PTS: "#8b5cf6", VS: "#0bb4d4", Hort: "#f59e0b", gemeinsam: "#64748b",
-  free: "#22c55e", emerg: "#facc15", conflict: "#ef4444", reserved: "#94a3b8",
+  free: "#22c55e", emerg: "#facc15", conflict: "#ef4444", reserved: "#94a3b8", admin: "#c3cad6",
 };
 const LABEL_MODES = [["free", "Nur freie Räume beschriftet"], ["all", "Alle Räume beschriftet"], ["none", "Keine Beschriftung"]];
 
@@ -18,7 +18,8 @@ export function roomStates(data, iso, period) {
   for (const r of data.rooms) {
     const c = st.get(r.id);
     let kind, color, label;
-    if (c.groups.length > 1) { kind = "conflict"; color = KIND_COLORS.conflict; label = c.groups.map((g) => G[g]?.name).join("+"); }
+    if (["Verwaltung", "Nebenraum"].includes(r.typ)) { kind = "admin"; color = KIND_COLORS.admin; label = r.typ; }
+    else if (c.groups.length > 1) { kind = "conflict"; color = KIND_COLORS.conflict; label = c.groups.map((g) => G[g]?.name).join("+"); }
     else if (c.groups.length) { kind = "busy"; const b = G[c.groups[0]]?.bereich || r.bereich; color = KIND_COLORS[b] || KIND_COLORS.gemeinsam; label = G[c.groups[0]]?.name || "?"; }
     else if (c.reserved) { kind = "reserved"; color = KIND_COLORS.reserved; label = "reserviert"; }
     else if (r.notnutzung) { kind = "emerg"; color = KIND_COLORS.emerg; label = "zur Not"; }
@@ -32,6 +33,7 @@ export function roomStates(data, iso, period) {
 export async function mountScene(host, store, opts = {}) {
   const sel = { iso: null, period: null, follow: true, floor: null, exploded: false, playing: null, room: null, labels: "free" };
   try { sel.labels = localStorage.getItem("raumplan-labels") || "free"; } catch {}
+  setFloorNames(store.data.settings.stockNamen);
   syncNow();
   host.innerHTML = `
     <div class="s3d">
@@ -64,13 +66,13 @@ export async function mountScene(host, store, opts = {}) {
   const s3d = $(".s3d", host);
   let b;
   try {
-    b = await createBuilding($(".s3d-canvas", host), store.data.rooms, { labels: sel.labels, onSelect: (id) => { sel.room = id; b.select(id); renderInfo(); } });
+    b = await createBuilding($(".s3d-canvas", host), store.data.rooms, { gebaeude: store.data.settings.gebaeude || [], labels: sel.labels, onSelect: (id) => { sel.room = id; b.select(id); renderInfo(); } });
   } catch (e) {
     $(".s3d-canvas", host).innerHTML = `<div class="s3d-fallback">3D wird von diesem Gerät nicht unterstützt (${h(e.message)}).</div>`;
     return { sel, refresh() {}, tick() {}, setSel() {} };
   }
   let roomSig = sig(store.data.rooms) + "#" + store.data.settings.periods.map((p) => p.nr).join(",");
-  function sig(rooms) { return rooms.map((r) => [r.id, r.name, r.stock, r.trakt, r.groesse, r.typ, r.bereich, r.sort].join("|")).join(";"); }
+  function sig(rooms) { return rooms.map((r) => [r.id, r.name, r.stock, r.trakt, r.groesse, r.typ, r.bereich, r.sort, r.seite].join("|")).join(";") + JSON.stringify(store.data.settings.gebaeude || []) + JSON.stringify(store.data.settings.stockNamen || {}); }
   function syncNow() {
     const now = new Date(); const today = schoolToday(now); const isToday = isoDate(today) === isoDate(now);
     const cp = currentPeriod(store.data.settings.periods, now);
@@ -106,14 +108,14 @@ export async function mountScene(host, store, opts = {}) {
     const d = store.data;
     if (!d.rooms.length) return;
     const s2 = sig(d.rooms) + "#" + d.settings.periods.map((p) => p.nr).join(",");
-    if (s2 !== roomSig) { roomSig = s2; b.rebuild(d.rooms); b.setFloor(sel.floor); b.setExploded(sel.exploded); renderControls(); }
+    if (s2 !== roomSig) { roomSig = s2; setFloorNames(d.settings.stockNamen); b.rebuild(d.rooms, d.settings.gebaeude || []); b.setFloor(sel.floor); b.setExploded(sel.exploded); renderControls(); }
     const states = roomStates(d, sel.iso, sel.period);
     b.update(states);
     const now = new Date(); const date = parseIso(sel.iso);
     const cp = currentPeriod(d.settings.periods, now);
     const isNow = sel.iso === isoDate(now) && cp.status === "jetzt" && cp.nr === sel.period;
     const per = d.settings.periods.find((p) => p.nr === sel.period);
-    const regular = d.rooms.filter((r) => !r.notnutzung);
+    const regular = d.rooms.filter((r) => !r.notnutzung && !["Verwaltung", "Nebenraum"].includes(r.typ));
     const free = regular.filter((r) => states.get(r.id).kind === "free").length;
     const emerg = d.rooms.filter((r) => states.get(r.id).kind === "emerg").length;
     $(".when", host).innerHTML = `

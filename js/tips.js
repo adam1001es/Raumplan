@@ -1,6 +1,6 @@
 // Automatische Hinweise für die Direktion.
 
-import { isoDate, addDays, weekday, DAY_SHORT, fmtDate, currentPeriod, slotState, isBusy, weekUtil, byId, schoolToday } from "./model.js";
+import { isoDate, addDays, weekday, DAY_SHORT, fmtDate, currentPeriod, slotState, isBusy, weekUtil, byId, schoolToday, bookable } from "./model.js";
 import { fmtPeriods } from "./parser.js";
 
 /** Liefert [{level:'ok'|'info'|'warn'|'alert', icon, title, text}] */
@@ -17,7 +17,7 @@ export function computeTips(data, now = new Date()) {
   const cp = isToday ? currentPeriod(data.settings.periods, now) : { status: "vor", nr: periods[0] };
   if (cp.nr) {
     const st = slotState(data, isoDate(today), cp.nr);
-    const free = data.rooms.filter((r) => !isBusy(st.get(r.id)));
+    const free = data.rooms.filter((r) => bookable(r) && !isBusy(st.get(r.id)));
     const normal = free.filter((r) => !r.notnutzung), emerg = free.filter((r) => r.notnutzung);
     const when = cp.status === "jetzt" ? `Jetzt (${cp.nr}. EH)` : `${isToday ? "Nächste" : DAY_SHORT[weekday(today)]} ${cp.nr}. EH`;
     tips.push({
@@ -69,7 +69,7 @@ export function computeTips(data, now = new Date()) {
   }
   if (peaks.length) {
     const worst = peaks.sort((a, b) => b.s.busy / b.s.total - a.s.busy / a.s.total)[0];
-    const emerg = data.rooms.filter((r) => r.notnutzung && !isBusy(worst.s.state.get(r.id)));
+    const emerg = data.rooms.filter((r) => bookable(r) && r.notnutzung && !isBusy(worst.s.state.get(r.id)));
     tips.push({
       level: "warn", icon: "📈", title: `Engpass: ${peaks.length} Einheit${peaks.length > 1 ? "en" : ""} fast voll`,
       text: `Am knappsten ${DAY_SHORT[worst.d]} ${worst.p}. EH (${worst.s.busy}/${worst.s.total} Räume).` + (emerg.length ? ` Ausweich: ${emerg.map((r) => r.name).join(", ")}.` : ""),
@@ -79,7 +79,7 @@ export function computeTips(data, now = new Date()) {
   // 5) Hort-Räume am Vormittag / Klassenräume am Nachmittag
   const morning = data.settings.periods.filter((p) => p.start < "12:30").map((p) => p.nr);
   const afternoon = data.settings.periods.filter((p) => p.start >= "12:30").map((p) => p.nr);
-  const hortRooms = data.rooms.filter((r) => r.typ === "Hort" || r.bereich === "Hort");
+  const hortRooms = data.rooms.filter((r) => r.typ === "Hort");
   const hortFreeMorning = hortRooms.filter((r) => {
     let free = 0, tot = 0;
     for (let d = 1; d <= 5; d++) for (const p of morning) { tot++; if (!isBusy(util.bySlot[d][p].state.get(r.id))) free++; }
@@ -97,7 +97,7 @@ export function computeTips(data, now = new Date()) {
   }
 
   // 6) Wenig genutzte Räume
-  const low = data.rooms.filter((r) => !r.notnutzung && r.typ !== "Hort" && util.byRoom[r.id] < 0.3).sort((a, b) => util.byRoom[a.id] - util.byRoom[b.id]);
+  const low = data.rooms.filter((r) => bookable(r) && !r.notnutzung && r.typ !== "Hort" && util.byRoom[r.id] < 0.3).sort((a, b) => util.byRoom[a.id] - util.byRoom[b.id]);
   if (low.length) tips.push({ level: "info", icon: "📉", title: "Wenig genutzt (Reserve)", text: low.slice(0, 4).map((r) => `${r.name} ${Math.round(util.byRoom[r.id] * 100)} %`).join(" · ") });
 
   return tips;

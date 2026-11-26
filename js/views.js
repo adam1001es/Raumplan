@@ -1,7 +1,7 @@
 // Wiederverwendbare Darstellungen (Raumkarten, Wochenraster, Änderungsliste, Legende).
 
 import { h } from "./ui.js";
-import { slotState, isBusy, byId, bereichClass, DAY_SHORT, weekday, parseIso, fmtDate } from "./model.js";
+import { slotState, isBusy, byId, bereichClass, DAY_SHORT, weekday, parseIso, fmtDate, bookable } from "./model.js";
 import { fmtPeriods } from "./parser.js";
 
 export function legendHtml() {
@@ -16,7 +16,7 @@ export function roomCardsHtml(data, iso, period, opts = {}) {
   const G = byId(data.groups);
   const st = slotState(data, iso, period);
   const q = (opts.search || "").toLowerCase().trim();
-  let rooms = data.rooms;
+  let rooms = data.rooms.filter(bookable);
   if (opts.filter && opts.filter !== "alle") {
     if (opts.filter === "frei") rooms = rooms.filter((r) => !isBusy(st.get(r.id)));
     else rooms = rooms.filter((r) => r.bereich === opts.filter || st.get(r.id).groups.some((g) => G[g]?.bereich === opts.filter));
@@ -56,7 +56,7 @@ export function planTableHtml(data, { mode, iso, day, nowPeriod, clickable, bere
       states[p.nr] = m;
     }
   }
-  let rooms = data.rooms;
+  let rooms = data.rooms.filter(bookable);
   if (bereich && bereich !== "alle") rooms = rooms.filter((r) => r.bereich === bereich);
   const head = `<tr><th class="rn">Raum</th>${periods.map((p) => `<th>${p.nr}.<small>${h(p.start)}</small></th>`).join("")}</tr>`;
   const body = rooms.map((r) => `<tr><th class="rn">${h(r.name)}<small>${h(r.typ)}</small></th>${periods.map((p) => {

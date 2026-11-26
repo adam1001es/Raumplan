@@ -21,12 +21,14 @@ create table if not exists public.rooms (
   sort int default 0,
   trakt text default '',
   stock int,
-  groesse int default 1
+  groesse int default 1,
+  seite text
 );
 -- (für bereits angelegte Datenbanken)
 alter table public.rooms add column if not exists trakt text default '';
 alter table public.rooms add column if not exists stock int;
 alter table public.rooms add column if not exists groesse int default 1;
+alter table public.rooms add column if not exists seite text;
 
 create table if not exists public.groups (
   id uuid primary key default gen_random_uuid(),

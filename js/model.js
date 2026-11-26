@@ -3,7 +3,9 @@
 export const DAY_NAMES = ["", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 export const DAY_SHORT = ["", "Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 export const BEREICHE = ["NMS", "PTS", "VS", "Hort", "gemeinsam"];
-export const ROOM_TYPES = ["Klassenraum", "Turnsaal", "Werkraum", "EDV", "Musik", "Hort", "Bibliothek", "Mehrzweck", "Speisesaal", "Sonstiges"];
+export const ROOM_TYPES = ["Klassenraum", "Turnsaal", "Werkraum", "EDV", "Musik", "Hort", "Bibliothek", "Mehrzweck", "Speisesaal", "Sonstiges", "Verwaltung", "Nebenraum"];
+/** Räume, die für Unterricht vergeben werden können (nicht Direktion, Küche, WC …) */
+export const bookable = (r) => !["Verwaltung", "Nebenraum"].includes(r.typ);
 
 // ── Datum ──────────────────────────────────────────────────────
 export function isoDate(d) {
@@ -118,7 +120,7 @@ export function whereIs(data, gid, dateIso, period) {
 /** Auslastung für eine Woche: {byRoom: {rid: pct}, bySlot: {d: {p: {busy,total}}}} */
 export function weekUtil(data, monday) {
   const periods = data.settings.periods.map((p) => p.nr);
-  const regular = data.rooms.filter((r) => !r.notnutzung);
+  const regular = data.rooms.filter((r) => !r.notnutzung && bookable(r));
   const byRoomCount = Object.fromEntries(data.rooms.map((r) => [r.id, 0]));
   const bySlot = {};
   for (let d = 1; d <= 5; d++) {

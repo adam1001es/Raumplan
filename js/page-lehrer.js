@@ -1,7 +1,7 @@
 // Übersicht für Lehrkräfte: animiertes 3D-Gebäude + kurze Listen. Nur ansehen.
 
 import { bootPage, $, h, everyMinute } from "./ui.js";
-import { isoDate, parseIso, weekday, fmtDate, DAY_SHORT, slotState, isBusy, byId, bereichClass, currentPeriod } from "./model.js";
+import { isoDate, parseIso, weekday, fmtDate, DAY_SHORT, slotState, isBusy, byId, bereichClass, currentPeriod, bookable } from "./model.js";
 import { planTableHtml, changeLogHtml } from "./views.js";
 import { mountScene } from "./scene3d.js";
 
@@ -25,7 +25,7 @@ function renderBelow(sel) {
   const d = store.data; const G = byId(d.groups), R = byId(d.rooms);
   const st = slotState(d, sel.iso, sel.period);
   const date = parseIso(sel.iso);
-  const free = d.rooms.filter((r) => !isBusy(st.get(r.id)));
+  const free = d.rooms.filter((r) => bookable(r) && !isBusy(st.get(r.id)));
   const where = {};
   for (const [rid, c] of st) for (const g of c.groups) (where[g] ||= []).push(R[rid]?.name);
   const away = new Set(); for (const [, c] of st) c.freedBy.forEach((g) => { if (!where[g]) away.add(g); });

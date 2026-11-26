@@ -6,7 +6,7 @@
 
 import {
   DAY_SHORT, isoDate, parseIso, addDays, weekday, fmtDate, schoolToday, nextWeekday,
-  currentPeriod, slotState, isBusy, byId,
+  currentPeriod, slotState, isBusy, byId, bookable,
 } from "./model.js";
 
 export function norm(s) {
@@ -138,7 +138,7 @@ function extractNote(raw) {
 /** Freie Räume für Datum + Einheiten (frei in ALLEN angegebenen). */
 export function freeRooms(data, dateIso, periods) {
   const states = periods.map((p) => slotState(data, dateIso, p));
-  return data.rooms.filter((r) => states.every((st) => !isBusy(st.get(r.id))));
+  return data.rooms.filter((r) => bookable(r) && states.every((st) => !isBusy(st.get(r.id))));
 }
 
 export const HELP_TEXT =

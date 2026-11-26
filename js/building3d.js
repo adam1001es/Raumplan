@@ -11,62 +11,84 @@ import { CSS2DRenderer, CSS2DObject } from "./vendor/CSS2DRenderer.js";
 const UNIT = 3.2, DEPTH = 3.2, CORRIDOR = 1.4, WALL_H = 1.7, SLAB = 0.14;
 const GAP_REAL = 2.15, GAP_EXPLODED = 3.6;
 
-export const FLOOR_NAMES = (s) => (s === 0 ? "EG" : s < 0 ? `${-s}. UG` : `${s}. OG`);
+let floorNameOverrides = {};
+export function setFloorNames(m) { floorNameOverrides = m || {}; }
+export const FLOOR_NAMES = (s) => floorNameOverrides[s] || (s === 0 ? "EG" : s < 0 ? `${-s}. UG` : `${s}. OG`);
 
-/** Gebäude, Stock und Größe eines Raums (mit Standardwerten). */
+/** Gebäude, Stock, Größe und Seite eines Raums (mit Standardwerten). */
 export function roomPlace(r, idxInBereich = 0) {
   const trakt = (r.trakt || "").trim() || "Schulhaus";
   let stock = r.stock !== null && r.stock !== undefined && r.stock !== "" && Number.isFinite(+r.stock) ? +r.stock : null;
   if (stock === null) stock = ["Turnsaal", "Speisesaal", "Mehrzweck", "Werkraum", "Hort"].includes(r.typ) ? 0 : 1 + Math.floor(idxInBereich / 6);
   const groesse = +r.groesse || (r.typ === "Turnsaal" ? 2 : 1);
-  return { trakt, stock, groesse };
+  const seite = r.seite === "hof" || r.seite === "strasse" ? r.seite : null;
+  return { trakt, stock, groesse, seite };
 }
 
-export function computeLayout(rooms, stackZ = false) {
+/**
+ * Räume auf Trakte/Stockwerke verteilen.
+ * gebaeude (optional): [{ name, x, z, rot (Grad), flip }] – Lage und Drehung der Trakte.
+ * Ohne Angabe stehen die Trakte nebeneinander.
+ */
+export function computeLayout(rooms, stackZ = false, gebaeude = []) {
   const counters = {};
   const placed = rooms.map((r) => {
     const key = r.bereich + (r.typ === "Klassenraum" ? "K" : "F");
     const i = (counters[key] = (counters[key] ?? -1) + 1);
     return { room: r, ...roomPlace(r, i) };
   });
-  const trakts = [...new Set(placed.map((p) => p.trakt))];
-  const out = [], slabs = [], floors = new Set();
+  const cfgs = Object.fromEntries((gebaeude || []).map((g) => [g.name, g]));
+  const trakts = [...new Set([...(gebaeude || []).map((g) => g.name).filter((n) => placed.some((p) => p.trakt === n)), ...placed.map((p) => p.trakt)])];
   const TD = 2 * DEPTH + CORRIDOR;
-  let xCursor = 0, zCursor = 0, maxW = 0;
-  for (const t of trakts) {
+  const out = [], slabs = [], fill = [], floors = new Set();
+  let xCursor = 0, zCursor = 0;
+  trakts.forEach((t, ti) => {
+    const cfg = cfgs[t];
     const inT = placed.filter((p) => p.trakt === t);
     const stocks = [...new Set(inT.map((p) => p.stock))].sort((a, b) => a - b);
-    const per = {}; let traktW = 0;
+    const bySide = !!cfg || inT.some((p) => p.seite);
+    const local = []; const lslabs = []; const fillers = []; let traktW = 0;
     for (const s of stocks) {
       const rows = [[], []], len = [0, 0];
       for (const p of inT.filter((q) => q.stock === s).sort((a, b) => (a.room.sort ?? 0) - (b.room.sort ?? 0))) {
-        const ri = len[0] <= len[1] ? 0 : 1; rows[ri].push(p); len[ri] += p.groesse * UNIT;
+        let ri = len[0] <= len[1] ? 0 : 1;
+        if (bySide) ri = (p.seite || (p.room.typ === "Klassenraum" ? "strasse" : "hof")) === "strasse" ? 0 : 1;
+        rows[ri].push(p); len[ri] += p.groesse * UNIT;
       }
-      per[s] = { rows, len, w: Math.max(len[0], len[1]) };
-      traktW = Math.max(traktW, per[s].w); floors.add(s);
-    }
-    const x0 = stackZ ? -traktW / 2 : xCursor, z0 = stackZ ? zCursor : 0;
-    for (const s of stocks) {
-      const { rows, len, w } = per[s];
+      const w = Math.max(len[0], len[1], UNIT, (+cfg?.laenge || 0) * UNIT);
       rows.forEach((row, ri) => {
-        let x = x0 + (traktW - w) / 2 + (w - len[ri]) / 2;
-        for (const p of row) {
-          const pw = p.groesse * UNIT;
-          out.push({ ...p, x: x + pw / 2, z: z0 + (ri === 0 ? -1 : 1) * (CORRIDOR / 2 + DEPTH / 2), w: pw, d: DEPTH });
-          x += pw;
-        }
+        let x = bySide ? 0 : (w - len[ri]) / 2;
+        const side = (ri === 0 ? -1 : 1) * (cfg?.flip ? -1 : 1);
+        for (const p of row) { const pw = p.groesse * UNIT; local.push({ ...p, lx: x + pw / 2, lz: side * (CORRIDOR / 2 + DEPTH / 2), w: pw, d: DEPTH }); x += pw; }
+        // freie Fläche (Stiegenhaus, WC, Gang …) als neutraler Block
+        if (bySide && w - x > 0.5) fillers.push({ trakt: t, stock: s, lx: x + (w - x) / 2, lz: side * (CORRIDOR / 2 + DEPTH / 2), w: w - x, d: DEPTH });
       });
-      slabs.push({ trakt: t, stock: s, x: x0 + traktW / 2, z: z0, w: w + 0.5, d: TD + 0.5 });
+      lslabs.push({ trakt: t, stock: s, lx: w / 2, w: w + 0.5, d: TD + 0.5, main: ti === 0 });
+      traktW = Math.max(traktW, w); floors.add(s);
     }
-    maxW = Math.max(maxW, traktW);
-    if (stackZ) zCursor += TD + 5; else xCursor += traktW + 5;
+    let ox, oz, rot = 0;
+    if (cfg) { ox = +cfg.x || 0; oz = +cfg.z || 0; rot = ((+cfg.rot || 0) * Math.PI) / 180; }
+    else if (stackZ) { ox = -traktW / 2; oz = zCursor; zCursor += TD + 5; }
+    else { ox = xCursor; oz = 0; xCursor += traktW + 5; }
+    if (cfg && !stackZ) xCursor = Math.max(xCursor, ox + traktW + 5);
+    const c = Math.cos(rot), sn = Math.sin(rot);
+    const tf = (lx, lz) => [ox + lx * c + lz * sn, oz - lx * sn + lz * c];
+    for (const o of local) { const [x, z] = tf(o.lx, o.lz); out.push({ ...o, x, z, rot }); }
+    for (const o of lslabs) { const [x, z] = tf(o.lx, 0); slabs.push({ ...o, x, z, rot }); }
+    for (const o of fillers) { const [x, z] = tf(o.lx, o.lz); fill.push({ ...o, x, z, rot }); }
+  });
+  // Mittelpunkt + Ausdehnung aus allen Stockwerksplatten
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const s of slabs) for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    const lx = (a * s.w) / 2, lz = (b * s.d) / 2;
+    const x = s.x + lx * Math.cos(s.rot) + lz * Math.sin(s.rot), z = s.z - lx * Math.sin(s.rot) + lz * Math.cos(s.rot);
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
   }
-  const width = stackZ ? maxW : xCursor - 5;
-  const depth = stackZ ? zCursor - 5 : TD;
-  const dx = stackZ ? 0 : width / 2, dz = stackZ ? (depth - TD) / 2 : 0;
-  out.forEach((o) => { o.x -= dx; o.z -= dz; });
-  slabs.forEach((o) => { o.x -= dx; o.z -= dz; });
-  return { rooms: out, slabs, floors: [...floors].sort((a, b) => a - b), width, depth };
+  const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+  out.forEach((o) => { o.x -= cx; o.z -= cz; });
+  slabs.forEach((o) => { o.x -= cx; o.z -= cz; });
+  fill.forEach((o) => { o.x -= cx; o.z -= cz; });
+  return { rooms: out, slabs, fill, configured: (gebaeude || []).length > 0, floors: [...floors].sort((a, b) => a - b), width: maxX - minX, depth: maxZ - minZ };
 }
 
 function webglOk() {
@@ -100,7 +122,7 @@ export async function createBuilding(container, rooms, opts = {}) {
   scene.add(sun);
 
   const world = new THREE.Group(); scene.add(world);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: dark ? 0.35 : 0.12 }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: dark ? 0.25 : 0.07 }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -SLAB; ground.receiveShadow = true; scene.add(ground);
 
   let layout, stacked = false, lastRooms = rooms;
@@ -115,30 +137,33 @@ export async function createBuilding(container, rooms, opts = {}) {
     for (const g of floorGroups.values()) g.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
     world.clear(); meshes = new Map(); floorGroups = new Map();
     stacked = (container.clientWidth || 600) / (container.clientHeight || 400) < 0.95;
-    layout = computeLayout(list, stacked);
-    const topStock = Math.max(...layout.floors);
+    layout = computeLayout(list, stacked && !(opts.gebaeude?.length), opts.gebaeude);
 
     for (const s of layout.slabs) {
       if (!floorGroups.has(s.stock)) { const g = new THREE.Group(); g.userData = { stock: s.stock }; world.add(g); floorGroups.set(s.stock, g); }
       const g = floorGroups.get(s.stock);
       const slab = new THREE.Mesh(new THREE.BoxGeometry(s.w, SLAB, s.d), new THREE.MeshStandardMaterial({ color: slabColor, roughness: 0.85, transparent: true }));
-      slab.position.set(s.x, -SLAB / 2, s.z); slab.castShadow = true; slab.receiveShadow = true; slab.userData.base = 1; g.add(slab);
+      slab.position.set(s.x, -SLAB / 2, s.z); slab.rotation.y = s.rot; slab.castShadow = true; slab.receiveShadow = true; slab.userData.base = 1; g.add(slab);
       const edge = new THREE.LineSegments(new THREE.EdgesGeometry(slab.geometry), new THREE.LineBasicMaterial({ color: dark ? 0x4a5677 : 0xcfd6e3, transparent: true }));
-      edge.position.copy(slab.position); edge.userData.base = 1; g.add(edge);
+      edge.position.copy(slab.position); edge.rotation.y = s.rot; edge.userData.base = 1; g.add(edge);
       const corr = new THREE.Mesh(new THREE.PlaneGeometry(s.w - 0.5, CORRIDOR - 0.2), new THREE.MeshStandardMaterial({ color: corrColor, roughness: 1, transparent: true }));
-      corr.rotation.x = -Math.PI / 2; corr.position.set(s.x, 0.005, s.z); corr.userData.base = 1; g.add(corr);
-      const fl = document.createElement("div"); fl.className = "b3d-floor"; fl.textContent = FLOOR_NAMES(s.stock);
-      const fo = new CSS2DObject(fl); fo.position.set(s.x - s.w / 2 - 0.3, 0.2, s.z + s.d / 2); fo.center.set(1, 0.5); fo.userData.floorLabel = true; g.add(fo);
-      if (s.stock === topStock) { // Dach
+      corr.rotation.set(-Math.PI / 2, s.rot, 0, "YXZ"); corr.position.set(s.x, 0.005, s.z); corr.userData.base = 1; g.add(corr);
+      if (s.main) {
+        const fl = document.createElement("div"); fl.className = "b3d-floor"; fl.textContent = FLOOR_NAMES(s.stock);
+        const a = s.w / 2 + 0.5, lz = layout.configured ? -s.d / 2 : s.d / 2;
+        const fo = new CSS2DObject(fl); fo.position.set(s.x + a * Math.cos(s.rot) + lz * Math.sin(s.rot), 0.3, s.z - a * Math.sin(s.rot) + lz * Math.cos(s.rot)); fo.center.set(0, 0.5); fo.userData.floorLabel = true; g.add(fo);
+      }
+      const topOfTrakt = Math.max(...layout.slabs.filter((x) => x.trakt === s.trakt).map((x) => x.stock));
+      if (s.stock === topOfTrakt) { // Dach
         const roof = new THREE.Mesh(new THREE.BoxGeometry(s.w, SLAB, s.d), new THREE.MeshStandardMaterial({ color: slabColor, roughness: 0.85, transparent: true, opacity: 0.35, depthWrite: false }));
-        roof.position.set(s.x, WALL_H + SLAB / 2 + 0.05, s.z); roof.userData.base = 0.35; roof.userData.roof = true; g.add(roof);
+        roof.position.set(s.x, WALL_H + SLAB / 2 + 0.05, s.z); roof.rotation.y = s.rot; roof.userData.base = 0.35; roof.userData.roof = true; g.add(roof);
       }
     }
 
     for (const p of layout.rooms) {
       const g = floorGroups.get(p.stock);
       const w = p.w - 0.18, d = p.d - 0.18;
-      const room = new THREE.Group(); room.position.set(p.x, 0, p.z);
+      const room = new THREE.Group(); room.position.set(p.x, 0, p.z); room.rotation.y = p.rot || 0;
       const tile = new THREE.Mesh(new THREE.BoxGeometry(w - 0.1, 0.12, d - 0.1), new THREE.MeshStandardMaterial({ color: 0xd5dbe5, roughness: 0.6, transparent: true }));
       tile.position.y = 0.06; tile.receiveShadow = true; tile.castShadow = true; tile.userData.base = 1;
       const glass = new THREE.Mesh(new THREE.BoxGeometry(w, WALL_H, d), new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.15, metalness: 0, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide }));
@@ -154,6 +179,11 @@ export async function createBuilding(container, rooms, opts = {}) {
       room.userData = { roomId: p.room.id, tile, glass, frame, mk, lbl, el, kind: "free", target: C(0xd5dbe5), delay: p.stock * 0.18 + Math.random() * 0.25, stock: p.stock };
       glass.userData.roomId = p.room.id;
       g.add(room); meshes.set(p.room.id, room);
+    }
+    for (const f of layout.fill) {
+      const g = floorGroups.get(f.stock); if (!g) continue;
+      const box = new THREE.Mesh(new THREE.BoxGeometry(f.w - 0.18, 0.06, f.d - 0.18), new THREE.MeshStandardMaterial({ color: dark ? 0x3a4466 : 0xe3e8f0, roughness: 1, transparent: true, opacity: 0.8 }));
+      box.position.set(f.x, 0.03, f.z); box.rotation.y = f.rot; box.userData.base = 0.8; g.add(box);
     }
     applyFloors(true); fit(); introT0 = clock.getElapsedTime();
   }
@@ -194,8 +224,8 @@ export async function createBuilding(container, rooms, opts = {}) {
     const center = new THREE.Vector3(0, height * 0.5, 0);
     const radius = 0.5 * Math.hypot(layout.width + 1.5, layout.depth + 1.5, height + 0.5);
     const vF = (camera.fov * Math.PI) / 180, hF = 2 * Math.atan(Math.tan(vF / 2) * camera.aspect);
-    const dist = (radius / Math.sin(Math.min(vF, hF) / 2)) * (camera.aspect > 1 ? 1.0 : 0.84);
-    const dir = new THREE.Vector3(0.75, 0.5, 1).normalize();
+    const dist = (radius / Math.sin(Math.min(vF, hF) / 2)) * (camera.aspect > 1 ? 1.0 : 0.98);
+    const dir = (layout.configured ? new THREE.Vector3(-0.85, 0.62, 0.8) : new THREE.Vector3(0.75, 0.5, 1)).normalize();
     camera.position.copy(center).addScaledVector(dir, dist);
     controls.target.copy(center); controls.minDistance = 4; controls.maxDistance = dist * 2.5; controls.update();
     const span = radius * 2;
@@ -229,10 +259,11 @@ export async function createBuilding(container, rooms, opts = {}) {
       u.tile.material.color.lerp(u.target, 0.1);
       u.glass.material.color.lerp(u.target, 0.1);
       let em = 0;
-      if (u.kind === "free") em = 0.25 + 0.2 * Math.sin(t * 2.4 + u.delay * 7);
+      if (u.kind === "admin") em = 0;
+      else if (u.kind === "free") em = 0.25 + 0.2 * Math.sin(t * 2.4 + u.delay * 7);
       else if (u.kind === "conflict") em = 0.2 + 0.5 * Math.max(0, Math.sin(t * 6));
       u.tile.material.emissive.copy(u.target); u.tile.material.emissiveIntensity = em;
-      const gBase = sel ? 0.42 : u.kind === "busy" ? 0.2 : u.kind === "free" ? 0.12 : 0.16;
+      const gBase = sel ? 0.42 : u.kind === "admin" ? 0.3 : u.kind === "busy" ? 0.2 : u.kind === "free" ? 0.12 : 0.16;
       u.glass.material.opacity += (gBase * (dim ? 0.12 : 1) - u.glass.material.opacity) * 0.15;
       u.frame.material.color.lerp(sel ? white : u.target, 0.12);
       u.frame.material.opacity += ((dim ? 0.06 : sel ? 1 : 0.5) - u.frame.material.opacity) * 0.15;
@@ -262,7 +293,7 @@ export async function createBuilding(container, rooms, opts = {}) {
     setLabels(mode) { labelMode = mode; applyLabels(); },
     setAutoRotate(v) { autoWanted = v; controls.autoRotate = v; },
     select(id) { selected = id; for (const [rid, m] of meshes) m.userData.el.classList.toggle("sel", rid === id); applyLabels(); },
-    rebuild(list) { build(list); },
+    rebuild(list, gebaeude) { if (gebaeude !== undefined) opts.gebaeude = gebaeude; build(list); },
     resetView() { fit(); },
     dispose() { cancelAnimationFrame(raf); ro.disconnect(); renderer.dispose(); container.innerHTML = ""; },
   };

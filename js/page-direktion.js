@@ -206,7 +206,7 @@ function renderUtil(box) {
     const s = u.bySlot[wd][p.nr]; const v = s.total ? s.busy / s.total : 0;
     return `<td style="background:${heatColor(v)}" data-d="${wd}" data-p="${p.nr}" title="${s.busy} von ${s.total} Räumen belegt">${Math.round(v * 100)}%<small>${s.total - s.busy} frei</small></td>`;
   }).join("")}</tr>`).join("");
-  const byRoom = Object.entries(u.byRoom).filter(([id]) => R[id]).sort((a, b) => b[1] - a[1]);
+  const byRoom = Object.entries(u.byRoom).filter(([id]) => R[id] && !["Verwaltung", "Nebenraum"].includes(R[id].typ)).sort((a, b) => b[1] - a[1]);
   box.innerHTML = `
     <div class="plan-tools"><div class="row gap"><button class="ghost small" data-w="-1">‹</button><b>KW ${isoWeek(mon)} · ab ${fmtDate(mon)}</b><button class="ghost small" data-w="1">›</button></div></div>
     <div class="grid2">
@@ -260,13 +260,14 @@ function renderSettings(box, needsSetup) {
 
       <div class="card pad">
         <div class="row between"><h2>🚪 Räume <small>(${d.rooms.length})</small></h2><button class="ghost small" id="addRoom">+ Raum</button></div>
-        <div class="table-scroll"><table class="edit"><thead><tr><th>Name</th><th>Art</th><th>Bereich</th><th>Gebäude</th><th>Stock</th><th title="Breite im 3D-Plan (1 = normaler Raum)">Größe</th><th>Plätze</th><th title="Nur im Notfall nutzbar">Notfall</th><th></th></tr></thead><tbody>
+        <div class="table-scroll"><table class="edit"><thead><tr><th>Name</th><th>Art</th><th>Bereich</th><th>Gebäude</th><th>Stock</th><th>Seite</th><th title="Breite im 3D-Plan (1 = normaler Raum)">Größe</th><th>Plätze</th><th title="Nur im Notfall nutzbar">Notfall</th><th></th></tr></thead><tbody>
           ${d.rooms.map((r) => `<tr data-rid="${h(r.id)}">
             <td><input data-f="name" value="${h(r.name)}"></td>
             <td><select data-f="typ">${ROOM_TYPES.map((t) => opt(t, t, r.typ === t)).join("")}</select></td>
             <td><select data-f="bereich">${BEREICHE.map((b) => opt(b, b, r.bereich === b)).join("")}</select></td>
             <td><input data-f="trakt" list="traktList" value="${h(r.trakt || roomPlace(r).trakt)}" style="min-width:110px"></td>
             <td><select data-f="stock">${[-1, 0, 1, 2, 3, 4].map((n) => opt(n, FLOOR_NAMES(n), roomPlace(r).stock === n)).join("")}</select></td>
+            <td><select data-f="seite">${opt("", "auto", !r.seite)}${opt("strasse", "Straße", r.seite === "strasse")}${opt("hof", "Hof", r.seite === "hof")}</select></td>
             <td><input type="number" min="1" max="6" data-f="groesse" value="${h(roomPlace(r).groesse)}"></td>
             <td><input type="number" min="0" data-f="kapazitaet" value="${h(r.kapazitaet ?? "")}"></td>
             <td><input type="checkbox" data-f="notnutzung" ${r.notnutzung ? "checked" : ""}></td>
@@ -314,7 +315,7 @@ function renderSettings(box, needsSetup) {
   const seed = async () => {
     if (d.rooms.length && !confirm("Alle Räume, Klassen, Stundenplan und Änderungen werden durch Beispieldaten ersetzt. Fortfahren?")) return;
     const demo = buildDemoData();
-    await run(() => store.replaceAll({ rooms: demo.rooms, groups: demo.groups, schedule: demo.schedule, changes: [], settings: { periods: demo.settings.periods } }), "Beispieldaten geladen ✓");
+    await run(() => store.replaceAll({ rooms: demo.rooms, groups: demo.groups, schedule: demo.schedule, changes: [], settings: { periods: demo.settings.periods, gebaeude: demo.settings.gebaeude, stockNamen: demo.settings.stockNamen, schoolName: demo.settings.schoolName } }), "Beispieldaten geladen ✓");
   };
   $("#seed")?.addEventListener("click", seed);
   $("#seed2")?.addEventListener("click", seed);
@@ -333,7 +334,7 @@ function renderSettings(box, needsSetup) {
   // Räume & Klassen
   $$("tr[data-rid] [data-f]").forEach((el) => el.onchange = () => {
     const tr = el.closest("tr"); const r = store.data.rooms.find((x) => x.id === tr.dataset.rid);
-    const v = el.type === "checkbox" ? el.checked : (el.type === "number" || el.dataset.f === "stock") ? +el.value : el.value;
+    const v = el.type === "checkbox" ? el.checked : (el.type === "number" || el.dataset.f === "stock") ? +el.value : el.dataset.f === "seite" ? (el.value || null) : el.value;
     run(() => store.upsert("rooms", { ...r, [el.dataset.f]: v }));
   });
   $$("tr[data-gid] [data-f]").forEach((el) => el.onchange = () => {
