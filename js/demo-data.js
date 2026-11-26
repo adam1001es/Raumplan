@@ -46,15 +46,26 @@ export function buildDemoData() {
   add("bib", "Bibliothek", "Bibliothek", "gemeinsam", 20, true);
   add("aula", "Aula", "Mehrzweck", "gemeinsam", 80, true);
   add("sp", "Speisesaal", "Speisesaal", "gemeinsam", 60, true);
+  add("phy", "Physik", "Sonstiges", "gemeinsam", 26);
+  add("bio", "Biologie", "Sonstiges", "gemeinsam", 26);
+  add("tex", "Textil", "Werkraum", "gemeinsam", 20);
+  add("lern", "Lernraum", "Klassenraum", "NMS", 16);
+  add("bes", "Besprechung", "Mehrzweck", "gemeinsam", 12, true);
 
-  // Lage im Gebäude
-  const where = {
-    ts: ["Haupthaus", 0, 3], wr: ["Haupthaus", 0], sp: ["Haupthaus", 0, 2], aula: ["Haupthaus", 0, 2],
-    r1: ["Haupthaus", 1], r2: ["Haupthaus", 1], r3: ["Haupthaus", 1], r4: ["Haupthaus", 1], r5: ["Haupthaus", 1], r6: ["Haupthaus", 1], edv: ["Haupthaus", 1],
-    r7: ["Haupthaus", 2], r8: ["Haupthaus", 2], r9: ["Haupthaus", 2], r10: ["Haupthaus", 2], mu: ["Haupthaus", 2], bib: ["Haupthaus", 2],
-    h1: ["VS-Trakt", 0], h2: ["VS-Trakt", 0], r11: ["VS-Trakt", 0], r12: ["VS-Trakt", 1], r13: ["VS-Trakt", 1], r14: ["VS-Trakt", 1],
-  };
-  for (const r of rooms) { const w = where[r.id]; if (w) { r.trakt = w[0]; r.stock = w[1]; r.groesse = w[2] || 1; } }
+  // Lage im Gebäude: ein Block mit 6 Stockwerken (EG – 5. OG)
+  const floorsPlan = [
+    ["ts", "aula", "sp", "wr"],                 // EG  (Turnsaal + Aula doppelt breit)
+    ["h1", "h2", "r11", "r12", "r13", "tex"],   // 1. OG  VS & Hort
+    ["r14", "bib", "mu", "r1", "r2", "bes"],     // 2. OG
+    ["r3", "r4", "r5", "r6", "r7", "r8"],        // 3. OG  NMS
+    ["r9", "r10", "lern"],                       // 4. OG  PTS
+    ["phy", "bio", "edv"],                       // 5. OG  Fachräume
+  ];
+  floorsPlan.forEach((ids, stock) => ids.forEach((id, i) => {
+    const r = rooms.find((x) => x.id === id);
+    if (r) { r.trakt = "Schulhaus"; r.stock = stock; r.groesse = ["ts", "aula"].includes(id) ? 2 : 1; r.sort = stock * 10 + i; }
+  }));
+  rooms.sort((a, b) => a.sort - b.sort);
 
   const groups = [];
   const g = (id, name, bereich, stammraum, schueler) =>
@@ -97,6 +108,9 @@ export function buildDemoData() {
     { room: "wr", who: (x) => ["1a", "1b", "2a", "2b", "P1", "P2"].includes(x.name), n: 2, double: true },
     { room: "edv", who: (x) => ["3a", "3b", "4a", "4b", "P1", "P2"].includes(x.name), n: 1, double: false },
     { room: "mu", who: (x) => x.bereich === "NMS" || x.bereich === "VS", n: 1, double: false },
+    { room: "phy", who: (x) => ["3a", "3b", "4a", "4b", "P1", "P2"].includes(x.name), n: 2, double: false },
+    { room: "bio", who: (x) => x.bereich === "NMS", n: 2, double: false },
+    { room: "tex", who: (x) => ["1a", "1b", "2a", "2b"].includes(x.name), n: 2, double: true },
   ];
   const classes = groups.filter((x) => ["NMS", "PTS", "VS"].includes(x.bereich) && x.stammraum);
   for (const sp of special) {
@@ -128,10 +142,10 @@ export function buildDemoData() {
     place(d, 6, "h2", "ghB");
   }
   // Kleingruppen in freie Räume (oft Hort-Räume am Vormittag)
-  const smallSlots = [[1, 2], [1, 3], [2, 4], [3, 2], [4, 3], [5, 2]];
+  const smallSlots = [[1, 2], [1, 3], [2, 4], [3, 2], [4, 3], [5, 2], [2, 2], [3, 4], [4, 1], [5, 4]];
   smallSlots.forEach(([d, p], i) => {
     const gid = i % 2 ? "grel" : "gdf";
-    const free = rooms.find((r) => !r.notnutzung && r.typ !== "Turnsaal" && !occ[d][p].has(r.id) && r.bereich !== "VS");
+    const free = (gid === "gdf" && !occ[d][p].has("lern")) ? rooms.find((r) => r.id === "lern") : rooms.find((r) => !r.notnutzung && r.typ !== "Turnsaal" && !occ[d][p].has(r.id) && r.bereich !== "VS");
     if (free) place(d, p, free.id, gid);
   });
 
