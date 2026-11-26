@@ -60,7 +60,8 @@ export async function mountScene(host, store, opts = {}) {
   const s3d = $(".s3d", host);
   let b;
   try {
-    b = await createBuilding($(".s3d-canvas", host), store.data.rooms, { gebaeude: store.data.settings.gebaeude || [], onSelect: (id) => { sel.room = id; b.select(id); renderInfo(); } });
+    b = await createBuilding($(".s3d-canvas", host), store.data.rooms, { gebaeude: store.data.settings.gebaeude || [], onSelect: (id) => { sel.room = id; b.select(id); renderInfo(); },
+      onFloorPick: (stock) => { sel.floor = stock; b.setFloor(stock); renderControls(); refresh(); hint(); } });
   } catch (e) {
     $(".s3d-canvas", host).innerHTML = `<div class="s3d-fallback">3D wird von diesem Gerät nicht unterstützt (${h(e.message)}).</div>`;
     return { sel, refresh() {}, tick() {}, setSel() {} };
@@ -72,6 +73,12 @@ export async function mountScene(host, store, opts = {}) {
     const cp = currentPeriod(store.data.settings.periods, now);
     if (isToday && cp.status !== "nach") { sel.iso = isoDate(today); sel.period = cp.nr; }
     else { sel.iso = isoDate(isToday ? schoolToday(addDays(now, 1)) : today); sel.period = store.data.settings.periods[0]?.nr || 1; }
+  }
+  function hint() {
+    const old = $(".s3d-toast", host); if (old) old.remove();
+    const t = document.createElement("div"); t.className = "s3d-toast";
+    t.textContent = sel.floor === null ? "Stockwerk antippen, um es groß zu sehen" : `${FLOOR_NAMES(sel.floor)} · Raum antippen für Details`;
+    s3d.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
   const stopPlay = () => { if (sel.playing) { clearInterval(sel.playing); sel.playing = null; $(".play", host).textContent = "▶"; } };
 
@@ -173,7 +180,7 @@ export async function mountScene(host, store, opts = {}) {
   function renderControls() {
     const d = store.data;
     $(".floors", host).innerHTML = [`<button data-f="" class="${sel.floor === null ? "on" : ""}">Alle</button>`, ...[...b.floors()].reverse().map((f) => `<button data-f="${f}" class="${sel.floor === f ? "on" : ""}">${FLOOR_NAMES(f)}</button>`)].join("");
-    $$(".floors button", host).forEach((x) => x.onclick = () => { sel.floor = x.dataset.f === "" ? null : +x.dataset.f; b.setFloor(sel.floor); renderControls(); refresh(); });
+    $$(".floors button", host).forEach((x) => x.onclick = () => { sel.floor = x.dataset.f === "" ? null : +x.dataset.f; sel.room = null; b.select(null); $(".s3d-info", host).hidden = true; b.setFloor(sel.floor); renderControls(); refresh(); hint(); });
     const mon = mondayOf(schoolToday());
     $(".days", host).innerHTML = [1, 2, 3, 4, 5].map((wd) => { const dd = addDays(mon, wd - 1); return `<button data-iso="${isoDate(dd)}" class="${isoDate(dd) === sel.iso ? "on" : ""}">${DAY_SHORT[wd]} <small>${fmtDate(dd)}</small></button>`; }).join("");
     $$(".days button", host).forEach((x) => x.onclick = () => { stopPlay(); sel.iso = x.dataset.iso; sel.follow = false; refresh(); });
@@ -199,6 +206,7 @@ export async function mountScene(host, store, opts = {}) {
 
   renderControls();
   refresh();
+  setTimeout(hint, 1600);
   return {
     sel,
     refresh() { refresh(); },

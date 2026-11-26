@@ -91,6 +91,47 @@ export function computeLayout(rooms, stackZ = false, gebaeude = []) {
   return { rooms: out, slabs, fill, configured: (gebaeude || []).length > 0, floors: [...floors].sort((a, b) => a - b), width: maxX - minX, depth: maxZ - minZ };
 }
 
+/**
+ * Ganz leichte Einrichtung je Raumart. Liefert Boxen [x, y, z, breite, höhe, tiefe, dunkel?]
+ * im Raum-Koordinatensystem (Mitte des Raums, Boden = 0). w = Breite (x), d = Tiefe (z).
+ */
+export function furniture(r, w, d) {
+  const out = []; const B = (x, y, z, sx, sy, sz, dk = 0) => out.push([x, y, z, sx, sy, sz, dk]);
+  const n = (r.name || "").toLowerCase();
+  const desks = (cols, rows, dw = 0.5, dd = 0.3) => {
+    const mx = w * 0.16, mzF = d * 0.3, mzB = d * 0.14;
+    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+      const x = -w / 2 + mx + ((w - 2 * mx) * (i + 0.5)) / cols;
+      const z = -d / 2 + mzF + ((d - mzF - mzB) * (j + 0.5)) / rows;
+      B(x, 0.3, z, dw, 0.06, dd); B(x, 0.15, z, dw * 0.9, 0.3, 0.04);
+    }
+  };
+  const board = () => B(0, 1.05, -d / 2 + 0.06, Math.min(w * 0.55, 2.2), 0.5, 0.04, 1);
+  if (r.typ === "Klassenraum") { desks(3, 3); board(); B(-w * 0.28, 0.3, -d / 2 + 0.55, 0.6, 0.06, 0.32); }
+  else if (r.typ === "EDV") { desks(3, 3, 0.55, 0.3); board(); for (let i = 0; i < 9; i++) { const x = -w / 2 + w * 0.16 + ((w - w * 0.32) * ((i % 3) + 0.5)) / 3, z = -d / 2 + d * 0.3 + ((d * 0.56) * (Math.floor(i / 3) + 0.5)) / 3; B(x, 0.46, z - 0.06, 0.28, 0.2, 0.03, 1); } }
+  else if (r.typ === "Turnsaal") {
+    const lw = w * 0.82, ld = d * 0.72;
+    B(0, 0.13, -ld / 2, lw, 0.01, 0.05); B(0, 0.13, ld / 2, lw, 0.01, 0.05); B(-lw / 2, 0.13, 0, 0.05, 0.01, ld); B(lw / 2, 0.13, 0, 0.05, 0.01, ld); B(0, 0.13, 0, 0.05, 0.01, ld);
+    B(-lw / 2 + 0.1, 1.1, 0, 0.05, 0.5, 0.6, 1); B(lw / 2 - 0.1, 1.1, 0, 0.05, 0.5, 0.6, 1);
+  }
+  else if (r.typ === "Speisesaal") { for (let i = 0; i < 3; i++) { const z = -d / 2 + d * (0.25 + i * 0.25); B(0, 0.3, z, w * 0.75, 0.06, 0.4); } }
+  else if (r.typ === "Bibliothek") { B(-w / 2 + 0.15, 0.6, 0, 0.22, 1.1, d * 0.8); B(0, 0.6, -d / 2 + 0.15, w * 0.7, 1.1, 0.22); B(w * 0.12, 0.3, d * 0.12, 0.9, 0.06, 0.6); }
+  else if (r.typ === "Werkraum") { for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) B(-w * 0.2 + i * w * 0.4, 0.38, -d * 0.12 + j * d * 0.36, w * 0.3, 0.1, 0.55); board(); }
+  else if (r.typ === "Hort") { B(-w * 0.2, 0.3, 0, 0.9, 0.06, 0.9); B(w * 0.2, 0.3, -d * 0.15, 0.9, 0.06, 0.6); B(w * 0.25, 0.22, d * 0.3, 1.2, 0.3, 0.4); }
+  else if (r.typ === "Verwaltung") { if (w > 1.2) { B(-w * 0.18, 0.3, 0, Math.min(0.7, w * 0.35), 0.06, 0.4); B(w * 0.18, 0.3, d * 0.15, Math.min(0.7, w * 0.35), 0.06, 0.4); } else B(0, 0.3, 0, w * 0.6, 0.06, 0.35); }
+  else if (r.typ === "Nebenraum") { if (n.includes("stiege")) for (let i = 0; i < 7; i++) B(-w * 0.2, 0.08 + i * 0.16, -d * 0.35 + i * 0.22, w * 0.35, 0.08, 0.22); }
+  else if (r.typ === "Mehrzweck") {
+    if (n.includes("kapelle")) { for (let i = 0; i < 4; i++) { B(-w * 0.2, 0.25, -d * 0.2 + i * d * 0.17, w * 0.3, 0.12, 0.2); B(w * 0.2, 0.25, -d * 0.2 + i * d * 0.17, w * 0.3, 0.12, 0.2); } B(0, 0.4, -d / 2 + 0.35, 0.6, 0.4, 0.3, 1); }
+    else if (n.includes("besprech")) B(0, 0.32, 0, w * 0.55, 0.06, d * 0.35);
+    else { B(-w * 0.3, 0.22, d * 0.25, w * 0.25, 0.1, 0.3); B(w * 0.3, 0.22, d * 0.25, w * 0.25, 0.1, 0.3); }
+  }
+  else if (r.typ === "Sonstiges") {
+    if (n.includes("garten")) { for (let i = 0; i < 4; i++) B(-w * 0.3 + (i % 2) * w * 0.6, 0.2, -d * 0.2 + Math.floor(i / 2) * d * 0.4, 0.6, 0.35, 0.6); }
+    else { for (let j = 0; j < 3; j++) B(0, 0.38, -d * 0.18 + j * d * 0.24, w * 0.7, 0.08, 0.4); board(); }
+  }
+  return out;
+}
+
 function webglOk() {
   try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; }
 }
@@ -111,10 +152,10 @@ export async function createBuilding(container, rooms, opts = {}) {
   controls.enableDamping = true; controls.dampingFactor = 0.08;
   controls.maxPolarAngle = Math.PI * 0.49; controls.minPolarAngle = 0.12;
   controls.screenSpacePanning = true;
-  controls.autoRotate = true; controls.autoRotateSpeed = 0.35;
-  let idleT = null, autoWanted = true;
-  controls.addEventListener("start", () => { controls.autoRotate = false; clearTimeout(idleT); });
-  controls.addEventListener("end", () => { clearTimeout(idleT); idleT = setTimeout(() => (controls.autoRotate = autoWanted), 30000); });
+  controls.autoRotate = false; controls.autoRotateSpeed = 0.35;
+  let idleT = null, autoWanted = false, camGoal = null;
+  controls.addEventListener("start", () => { controls.autoRotate = false; camGoal = null; clearTimeout(idleT); });
+  controls.addEventListener("end", () => { clearTimeout(idleT); if (autoWanted) idleT = setTimeout(() => (controls.autoRotate = true), 30000); });
 
   scene.add(new THREE.HemisphereLight(0xffffff, dark ? 0x1b2236 : 0xc9d3e3, dark ? 1.2 : 1.5));
   const sun = new THREE.DirectionalLight(0xffffff, dark ? 1.1 : 1.6);
@@ -183,23 +224,44 @@ export async function createBuilding(container, rooms, opts = {}) {
       const box = new THREE.Mesh(new THREE.BoxGeometry(f.w - 0.18, 0.06, f.d - 0.18), new THREE.MeshStandardMaterial({ color: dark ? 0x3a4466 : 0xeef1f6, roughness: 1, transparent: true, opacity: 0.6 }));
       box.position.set(f.x, 0.03, f.z); box.rotation.y = f.rot; box.userData.base = 0.6; g.add(box);
     }
-    applyFloors(true); fit(); introT0 = clock.getElapsedTime();
+    // Einrichtung: pro Stockwerk zwei InstancedMeshes (hell / dunkel)
+    const perFloor = new Map();
+    for (const p of layout.rooms) {
+      const list = perFloor.get(p.stock) || []; perFloor.set(p.stock, list);
+      const c = Math.cos(p.rot || 0), sn = Math.sin(p.rot || 0);
+      for (const [bx, by, bz, sx, sy, sz, dk] of furniture(p.room, p.w - 0.3, p.d - 0.3)) list.push({ x: p.x + bx * c + bz * sn, y: by, z: p.z - bx * sn + bz * c, sx, sy, sz, rot: p.rot || 0, dk });
+    }
+    const unit = new THREE.BoxGeometry(1, 1, 1);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    for (const [stock, list] of perFloor) {
+      const g = floorGroups.get(stock); if (!g) continue;
+      for (const dk of [0, 1]) {
+        const items = list.filter((f) => f.dk === dk); if (!items.length) continue;
+        const mat = new THREE.MeshStandardMaterial({ color: dk ? (dark ? 0x93a0bd : 0x5b6678) : (dark ? 0xc9d2e6 : 0xffffff), roughness: 0.7, transparent: true, opacity: dk ? 0.75 : 0.92 });
+        const im = new THREE.InstancedMesh(unit, mat, items.length);
+        items.forEach((f, i) => { q.setFromAxisAngle(up, f.rot); m4.compose(new THREE.Vector3(f.x, f.y + 0.12, f.z), q, new THREE.Vector3(f.sx, f.sy, f.sz)); im.setMatrixAt(i, m4); });
+        im.userData.base = mat.opacity; im.castShadow = false; g.add(im);
+      }
+    }
+    applyFloors(true); fit(true); introT0 = clock.getElapsedTime();
   }
 
   const gap = () => (exploded ? GAP_EXPLODED : GAP_REAL);
   const floorY = (s) => layout.floors.indexOf(s) * gap();
   const dimmed = (s) => floorSel !== null && s !== floorSel;
   function applyFloors(instant = false) {
+    ground.visible = floorSel === null;
     for (const [s, g] of floorGroups) {
       g.userData.targetY = floorY(s);
       if (instant) g.position.y = g.userData.targetY + 10 + layout.floors.indexOf(s) * 2.5;
+      g.visible = floorSel === null || s === floorSel;
       const f = dimmed(s) ? 0.12 : 1;
       g.traverse((o) => {
         if (o.material && o.userData.base !== undefined) {
           o.material.opacity = o.userData.base * f;
           if (!o.userData.roof) o.material.depthWrite = f === 1;
         }
-        if (o.isCSS2DObject && o.userData.floorLabel) o.element.classList.toggle("dim", dimmed(s));
+        if (o.isCSS2DObject && o.userData.floorLabel) o.visible = g.visible;
         if (o.userData.roof) o.visible = false;
       });
     }
@@ -213,37 +275,62 @@ export async function createBuilding(container, rooms, opts = {}) {
     }
   }
 
-  function fit() {
+  function fit(instant = false) {
     const w = container.clientWidth || 600, h = container.clientHeight || 400;
     renderer.setSize(w, h); labelR.setSize(w, h);
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    if (layout && (w / h < 0.95) !== stacked && new Set(layout.slabs.map((s) => s.trakt)).size > 1) { build(lastRooms); return; }
-    const height = (layout.floors.length - 1) * gap() + WALL_H;
-    const center = new THREE.Vector3(0, height * 0.5, 0);
-    const radius = 0.5 * Math.hypot(layout.width + 1.5, layout.depth + 1.5, height + 0.5);
+    if (layout && (w / h < 0.95) !== stacked && new Set(layout.slabs.map((s) => s.trakt)).size > 1 && !(opts.gebaeude?.length)) { build(lastRooms); return; }
     const vF = (camera.fov * Math.PI) / 180, hF = 2 * Math.atan(Math.tan(vF / 2) * camera.aspect);
-    const dist = (radius / Math.sin(Math.min(vF, hF) / 2)) * (camera.aspect > 1 ? 1.0 : 0.98);
-    const dir = (layout.configured ? new THREE.Vector3(-0.85, 0.62, 0.8) : new THREE.Vector3(0.75, 0.5, 1)).normalize();
-    camera.position.copy(center).addScaledVector(dir, dist);
-    controls.target.copy(center); controls.minDistance = 4; controls.maxDistance = dist * 2.5; controls.update();
-    const span = radius * 2;
-    sun.position.set(span * 0.6, span * 1.2, span * 0.4);
-    const sc = sun.shadow.camera; sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span; sc.far = span * 5; sc.updateProjectionMatrix();
+    let center, dist, dir;
+    if (floorSel === null) {
+      const height = (layout.floors.length - 1) * gap() + WALL_H;
+      center = new THREE.Vector3(0, height * 0.5, 0);
+      const radius = 0.5 * Math.hypot(layout.width + 1.5, layout.depth + 1.5, height + 0.5);
+      dist = (radius / Math.sin(Math.min(vF, hF) / 2)) * (camera.aspect > 1 ? 1.0 : 0.86);
+      dir = (layout.configured ? new THREE.Vector3(-0.85, 0.62, 0.8) : new THREE.Vector3(0.75, 0.5, 1)).normalize();
+    } else {
+      const rs = layout.rooms.filter((r) => r.stock === floorSel);
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (const r of rs) { const e = Math.max(r.w, r.d) / 2; x0 = Math.min(x0, r.x - e); x1 = Math.max(x1, r.x + e); z0 = Math.min(z0, r.z - e); z1 = Math.max(z1, r.z + e); }
+      if (!rs.length) { x0 = z0 = -5; x1 = z1 = 5; }
+      center = new THREE.Vector3((x0 + x1) / 2, floorY(floorSel) + 0.4, (z0 + z1) / 2);
+      const radius = 0.5 * Math.hypot(x1 - x0, z1 - z0) + 0.5;
+      dist = (radius / Math.sin(Math.min(vF, hF) / 2)) * (camera.aspect > 1 ? 0.92 : 1.02);
+      dir = (layout.configured ? new THREE.Vector3(-0.45, 1.25, 0.55) : new THREE.Vector3(0.4, 1.25, 0.65)).normalize();
+    }
+    const pos = center.clone().addScaledVector(dir, dist);
+    controls.minDistance = 3; controls.maxDistance = dist * 3;
+    if (instant) { camera.position.copy(pos); controls.target.copy(center); camGoal = null; controls.update(); }
+    else camGoal = { pos, target: center };
+    const span = Math.max(layout.width, layout.depth, 10) * 1.2;
+    sun.position.set(span * 0.6, span * 1.2 + floorY(floorSel ?? 0), span * 0.4);
+    const sc = sun.shadow.camera; sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span; sc.far = span * 6; sc.updateProjectionMatrix();
   }
 
   const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let down = null;
   renderer.domElement.addEventListener("pointerdown", (e) => { down = { x: e.clientX, y: e.clientY }; });
   renderer.domElement.addEventListener("pointerup", (e) => {
-    if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
+    if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) return;
     const r = renderer.domElement.getBoundingClientRect();
     ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ptr, camera);
-    const targets = []; for (const m of meshes.values()) if (!dimmed(m.userData.stock)) targets.push(m.userData.glass);
+    if (floorSel === null) {
+      // Übersicht: Stockwerk wählen (Räume + Platten aller Etagen)
+      const targets = [];
+      for (const m of meshes.values()) targets.push(m.userData.glass);
+      for (const g of floorGroups.values()) g.children.forEach((o) => { if (o.isMesh && o.geometry?.type === "BoxGeometry" && o.userData.base === 1) { o.userData.stock = g.userData.stock; targets.push(o); } });
+      const hit = ray.intersectObjects(targets, false)[0];
+      if (!hit) return;
+      const stock = hit.object.userData.roomId ? meshes.get(hit.object.userData.roomId).userData.stock : hit.object.userData.stock;
+      opts.onFloorPick?.(stock, hit.object.userData.roomId || null);
+      return;
+    }
+    const targets = []; for (const m of meshes.values()) if (m.userData.stock === floorSel) targets.push(m.userData.glass);
     const hit = ray.intersectObjects(targets, false)[0];
     opts.onSelect?.(hit ? hit.object.userData.roomId : null);
   });
 
-  const ro = new ResizeObserver(() => fit()); ro.observe(container);
+  const ro = new ResizeObserver(() => fit(true)); ro.observe(container);
   let raf; const white = C(0xffffff);
   function loop() {
     raf = requestAnimationFrame(loop);
@@ -268,6 +355,10 @@ export async function createBuilding(container, rooms, opts = {}) {
       m.position.y = sel ? 0.25 + Math.sin(t * 3) * 0.05 : m.position.y * 0.85;
       if (u.mk.visible) { u.mk.rotation.y = t * 2; u.mk.position.y = WALL_H + 0.45 + Math.sin(t * 3) * 0.1; }
     }
+    if (camGoal) {
+      camera.position.lerp(camGoal.pos, 0.1); controls.target.lerp(camGoal.target, 0.1);
+      if (camera.position.distanceTo(camGoal.pos) < 0.05) camGoal = null;
+    }
     controls.update();
     renderer.render(scene, camera); labelR.render(scene, camera);
   }
@@ -285,8 +376,9 @@ export async function createBuilding(container, rooms, opts = {}) {
       }
       applyLabels();
     },
-    setFloor(s) { floorSel = s; applyFloors(); },
+    setFloor(s) { floorSel = s; applyFloors(); fit(); },
     setExploded(v) { exploded = v; applyFloors(); fit(); },
+    floor: () => floorSel,
     setLabels(mode) { labelMode = mode; applyLabels(); },
     setAutoRotate(v) { autoWanted = v; controls.autoRotate = v; },
     select(id) { selected = id; for (const [rid, m] of meshes) m.userData.el.classList.toggle("sel", rid === id); applyLabels(); },
