@@ -37,6 +37,7 @@ export async function mountScene(host, store, opts = {}) {
   host.innerHTML = `
     <div class="s3d plan">
       <div class="s3d-hud"><div class="when"></div><div class="free"></div></div>
+      <div class="s3d-key"><span><i style="background:#22c55e"></i>frei</span><span><i style="background:linear-gradient(90deg,#5b8def,#9b7bf0,#e5679f,#f0954a)"></i>besetzt (Farbe = Stockwerk)</span></div>
       <div class="s3d-canvas"></div>
       <div class="s3d-bottom glass">
         <div class="days"></div>
