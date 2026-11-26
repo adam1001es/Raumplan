@@ -256,7 +256,7 @@ table.edit input[type=number] { max-width: 80px; }
 .loading { padding: 3rem; text-align: center; color: var(--muted); }
 
 /* ── 3D-Gebäude ─────────────────────────────────────────────── */
-.s3d { position: relative; height: min(78vh, 780px); min-height: 480px; border-radius: 22px; overflow: hidden; touch-action: none;
+.s3d { position: relative; height: min(78vh, 780px); min-height: 480px; border-radius: 22px; overflow: hidden; touch-action: pan-y;
   background: linear-gradient(180deg, #f7f9fd 0%, #eaf0f9 60%, #e3e9f4 100%); border: 1px solid var(--line); }
 @media (prefers-color-scheme: dark) { .s3d { background: linear-gradient(180deg, #161e38 0%, #0f1630 70%, #0b1020 100%); } }
 .s3d-canvas, .s3d-canvas canvas, .b3d-labels { position: absolute; inset: 0; }

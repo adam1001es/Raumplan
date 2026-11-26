@@ -152,7 +152,7 @@ export async function createBuilding(container, rooms, opts = {}) {
   controls.enableDamping = true; controls.dampingFactor = 0.08;
   controls.maxPolarAngle = Math.PI * 0.49; controls.minPolarAngle = 0.12;
   controls.screenSpacePanning = true;
-  controls.autoRotate = false; controls.autoRotateSpeed = 0.35;
+  controls.autoRotate = false; controls.enabled = false; renderer.domElement.style.touchAction = "pan-y"; // Ansicht fest: nichts verschiebt sich beim Tippen
   let idleT = null, autoWanted = false, camGoal = null;
   controls.addEventListener("start", () => { controls.autoRotate = false; camGoal = null; clearTimeout(idleT); });
   controls.addEventListener("end", () => { clearTimeout(idleT); if (autoWanted) idleT = setTimeout(() => (controls.autoRotate = true), 30000); });
@@ -168,7 +168,7 @@ export async function createBuilding(container, rooms, opts = {}) {
 
   let layout, stacked = false, lastRooms = rooms;
   let meshes = new Map(), floorGroups = new Map();
-  let exploded = false, floorSel = null, selected = null, labelMode = "none";
+  let exploded = true, floorSel = null, selected = null, labelMode = "none";
   const clock = new THREE.Clock(); let introT0 = 0;
   const C = (hex) => new THREE.Color(hex);
   const slabColor = dark ? 0x2b3552 : 0xffffff, corrColor = dark ? 0x323d5e : 0xe9edf4;
@@ -294,9 +294,13 @@ export async function createBuilding(container, rooms, opts = {}) {
       for (const r of rs) { const e = Math.max(r.w, r.d) / 2; x0 = Math.min(x0, r.x - e); x1 = Math.max(x1, r.x + e); z0 = Math.min(z0, r.z - e); z1 = Math.max(z1, r.z + e); }
       if (!rs.length) { x0 = z0 = -5; x1 = z1 = 5; }
       center = new THREE.Vector3((x0 + x1) / 2, floorY(floorSel) + 0.4, (z0 + z1) / 2);
-      const radius = 0.5 * Math.hypot(x1 - x0, z1 - z0) + 0.5;
-      dist = (radius / Math.sin(Math.min(vF, hF) / 2)) * (camera.aspect > 1 ? 0.92 : 1.02);
-      dir = (layout.configured ? new THREE.Vector3(-0.45, 1.25, 0.55) : new THREE.Vector3(0.4, 1.25, 0.65)).normalize();
+      // lange Seite des Stockwerks entlang der langen Bildschirmseite ausrichten
+      const alongZ = (z1 - z0) > (x1 - x0);
+      const portrait = camera.aspect < 1;
+      dir = (alongZ === portrait ? new THREE.Vector3(-0.12, 2.2, 1) : new THREE.Vector3(-1, 2.2, 0.12)).normalize();
+      const halfV = Math.tan(vF / 2), halfH = Math.tan(hF / 2);
+      const sw = alongZ === portrait ? (x1 - x0) : (z1 - z0), sh = alongZ === portrait ? (z1 - z0) : (x1 - x0);
+      dist = Math.max((sw / 2 + 0.6) / halfH, (sh / 2 + 0.6) * 0.95 / halfV) + 2;
     }
     const pos = center.clone().addScaledVector(dir, dist);
     controls.minDistance = 3; controls.maxDistance = dist * 3;
@@ -315,14 +319,17 @@ export async function createBuilding(container, rooms, opts = {}) {
     ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ptr, camera);
     if (floorSel === null) {
-      // Übersicht: Stockwerk wählen (Räume + Platten aller Etagen)
-      const targets = [];
-      for (const m of meshes.values()) targets.push(m.userData.glass);
-      for (const g of floorGroups.values()) g.children.forEach((o) => { if (o.isMesh && o.geometry?.type === "BoxGeometry" && o.userData.base === 1) { o.userData.stock = g.userData.stock; targets.push(o); } });
-      const hit = ray.intersectObjects(targets, false)[0];
-      if (!hit) return;
-      const stock = hit.object.userData.roomId ? meshes.get(hit.object.userData.roomId).userData.stock : hit.object.userData.stock;
-      opts.onFloorPick?.(stock, hit.object.userData.roomId || null);
+      // Übersicht: das Stockwerk wählen, dessen Höhe am Bildschirm am nächsten am Finger liegt
+      const ty = e.clientY - r.top; let best = null, bd = Infinity;
+      for (const [stock, g] of floorGroups) {
+        const sl = layout.slabs.filter((x) => x.stock === stock);
+        const cx = sl.reduce((a2, x) => a2 + x.x, 0) / sl.length, cz = sl.reduce((a2, x) => a2 + x.z, 0) / sl.length;
+        const v = new THREE.Vector3(cx, g.position.y + WALL_H * 0.4, cz).project(camera);
+        const sy = (-v.y * 0.5 + 0.5) * r.height;
+        const dd = Math.abs(sy - ty);
+        if (dd < bd) { bd = dd; best = stock; }
+      }
+      if (best !== null) opts.onFloorPick?.(best, null);
       return;
     }
     const targets = []; for (const m of meshes.values()) if (m.userData.stock === floorSel) targets.push(m.userData.glass);

@@ -30,7 +30,7 @@ export function roomStates(data, iso, period) {
 
 /** host: Element. opts: { canEdit(), onEdit(roomId, iso, period), onSel(sel) } */
 export async function mountScene(host, store, opts = {}) {
-  const sel = { iso: null, period: null, follow: true, floor: null, exploded: false, playing: null, room: null };
+  const sel = { iso: null, period: null, follow: true, floor: null, exploded: true, playing: null, room: null };
   setFloorNames(store.data.settings.stockNamen);
   syncNow();
   host.innerHTML = `
@@ -43,8 +43,9 @@ export async function mountScene(host, store, opts = {}) {
       <div class="s3d-rail">
         <div class="glass floors"></div>
         <div class="glass tools">
-          <button data-t="explode" title="Stockwerke auseinanderziehen">⇕</button>
-          <button data-t="reset" title="Ansicht zurücksetzen">⌂</button>
+          <button data-t="up" title="Stockwerk höher">▲</button>
+          <button data-t="down" title="Stockwerk tiefer">▼</button>
+          <button data-t="reset" title="Ganzes Gebäude">⌂</button>
         </div>
       </div>
       <div class="s3d-info glass" hidden></div>
@@ -186,7 +187,6 @@ export async function mountScene(host, store, opts = {}) {
     $$(".days button", host).forEach((x) => x.onclick = () => { stopPlay(); sel.iso = x.dataset.iso; sel.follow = false; refresh(); });
     $(".pers", host).innerHTML = d.settings.periods.map((p) => `<button data-p="${p.nr}"><span>${p.nr}</span></button>`).join("");
     $$(".pers button", host).forEach((x) => x.onclick = () => { stopPlay(); sel.period = +x.dataset.p; sel.follow = false; refresh(); });
-    $("[data-t=explode]", host).classList.toggle("on", sel.exploded);
   }
 
   $(".play", host).onclick = () => {
@@ -199,8 +199,12 @@ export async function mountScene(host, store, opts = {}) {
   };
   $$(".tools button", host).forEach((x) => x.onclick = () => {
     const t = x.dataset.t;
-    if (t === "explode") { sel.exploded = !sel.exploded; b.setExploded(sel.exploded); }
-    if (t === "reset") { sel.floor = null; b.setFloor(null); b.resetView(); }
+    if (t === "up" || t === "down") {
+      const fl = b.floors(); let i = sel.floor === null ? (t === "up" ? -1 : fl.length) : fl.indexOf(sel.floor);
+      i = Math.max(0, Math.min(fl.length - 1, i + (t === "up" ? 1 : -1)));
+      sel.floor = fl[i]; sel.room = null; b.select(null); $(".s3d-info", host).hidden = true; b.setFloor(sel.floor); hint();
+    }
+    if (t === "reset") { sel.floor = null; sel.room = null; b.select(null); $(".s3d-info", host).hidden = true; b.setFloor(null); hint(); }
     renderControls(); refresh();
   });
 
