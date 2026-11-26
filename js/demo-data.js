@@ -38,33 +38,44 @@ export function buildDemoData() {
   const R = (id, name, typ, bereich, kapazitaet, notnutzung, trakt, stock, seite, groesse = 1) =>
     rooms.push({ id, name, typ, bereich, kapazitaet, notnutzung, trakt, stock, seite, groesse, sort: stock * 100 + rooms.length });
 
-  // EG
-  R("aula", "Aula", "Mehrzweck", "gemeinsam", 80, true, "Liniengasse", 0, "strasse", 2);
-  R("foyer", "Pforte & Foyer", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 0, "strasse");
+  // Reihenfolge je Stockwerk = von der Ecke Millergasse Richtung Eingang (Liniengasse 21).
+  // Stiegenhaus + Lift liegen auf jedem Stockwerk an derselben Stelle.
+  const core = (stock) => R(`st${stock}`, "Stiege & Lift", "Nebenraum", "gemeinsam", 0, false, "Liniengasse", stock, "strasse");
+  // EG – laut Fotos: Eingang → rechts Pforte (2 kleine Zimmer) → erste Tür rechts Stiegenhaus → Flur zum Turnsaal, Kantine hinten
   R("halle", "Halle", "Mehrzweck", "gemeinsam", 60, true, "Liniengasse", 0, "strasse", 2);
-  R("sp", "Speisesaal", "Speisesaal", "gemeinsam", 60, true, "Liniengasse", 0, "hof", 2);
+  core(0);
+  R("pf1", "Pforte", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 0, "strasse", 0.5);
+  R("pf2", "Pforte 2", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 0, "strasse", 0.5);
+  R("aula", "Aula / Eingang", "Mehrzweck", "gemeinsam", 80, true, "Liniengasse", 0, "strasse", 2);
+  R("sp", "Kantine / Speisesaal", "Speisesaal", "gemeinsam", 60, true, "Liniengasse", 0, "hof", 2);
   R("kueche", "Küche", "Nebenraum", "gemeinsam", 0, false, "Liniengasse", 0, "hof");
+  R("flur", "Flur zum Turnsaal", "Nebenraum", "gemeinsam", 0, false, "Liniengasse", 0, "hof");
   R("buffet", "Buffet", "Nebenraum", "gemeinsam", 0, false, "Liniengasse", 0, "hof");
-  R("gard", "Garderoben", "Nebenraum", "gemeinsam", 0, false, "Millergasse", 0, "strasse");
+  R("gard", "Garderoben", "Nebenraum", "gemeinsam", 0, false, "Liniengasse", 0, "hof");
   R("fs", "Festsaal/Turnsaal", "Turnsaal", "gemeinsam", 60, false, "Hof", 0, "strasse", 3);
   // 1. OG – Volksschule
   R("r101", "R101", "Klassenraum", "VS", 25, false, "Liniengasse", 1, "strasse");
   R("r102", "R102", "Klassenraum", "VS", 25, false, "Liniengasse", 1, "strasse");
+  core(1);
   R("r103", "R103", "Klassenraum", "VS", 25, false, "Liniengasse", 1, "strasse");
   R("r104", "R104", "Klassenraum", "VS", 25, false, "Liniengasse", 1, "strasse");
   R("wrt", "Werkraum techn.", "Werkraum", "gemeinsam", 26, false, "Liniengasse", 1, "hof");
   R("wrx", "Werkraum text.", "Werkraum", "gemeinsam", 26, false, "Liniengasse", 1, "hof");
   R("kap", "Kapelle", "Mehrzweck", "gemeinsam", 40, true, "Millergasse", 1, "strasse", 2);
-  // 2. OG – Verwaltung
-  R("dir", "Direktion", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 2, "strasse");
-  R("sek", "Sekretariat", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 2, "strasse");
+  // 2. OG – Verwaltung (laut Wegweiser)
+  R("dirvs", "Direktion VS", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 2, "strasse");
+  R("dirms", "Direktion MS", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 2, "strasse");
+  core(2);
+  R("sekvs", "Sekretariat VS", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 2, "strasse");
+  R("sekms", "Sekretariat MS", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 2, "strasse");
   R("buch", "Buchhaltung", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 2, "strasse");
-  R("lz", "Lehrerzimmer", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 2, "strasse", 2);
-  R("os", "Leitung Offene Schule", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 2, "hof");
+  R("lz", "Lehrerzimmer", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 2, "hof", 2);
+  R("hl", "Hortleitung", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 2, "hof");
   R("edv1", "EDV-Raum 1", "EDV", "gemeinsam", 26, false, "Millergasse", 2, "strasse");
   // 3. OG
   R("r301", "R301", "Klassenraum", "NMS", 26, false, "Liniengasse", 3, "strasse");
   R("r302", "R302", "Klassenraum", "NMS", 26, false, "Liniengasse", 3, "strasse");
+  core(3);
   R("r303", "R303", "Klassenraum", "NMS", 26, false, "Liniengasse", 3, "strasse");
   R("r304", "R304", "Klassenraum", "NMS", 26, false, "Liniengasse", 3, "strasse");
   R("bib", "Bibliothek", "Bibliothek", "gemeinsam", 24, true, "Liniengasse", 3, "hof", 2);
@@ -73,22 +84,25 @@ export function buildDemoData() {
   // 4. OG
   R("r401", "R401", "Klassenraum", "NMS", 26, false, "Liniengasse", 4, "strasse");
   R("r402", "R402", "Klassenraum", "NMS", 26, false, "Liniengasse", 4, "strasse");
+  core(4);
   R("r403", "R403", "Klassenraum", "NMS", 26, false, "Liniengasse", 4, "strasse");
   R("r404", "R404", "Klassenraum", "NMS", 26, false, "Liniengasse", 4, "strasse");
   R("edv2", "EDV-Raum 2", "EDV", "gemeinsam", 26, false, "Liniengasse", 4, "hof");
-  R("arzt", "Arztzimmer", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 4, "hof");
+  R("arzt", "Schularzt", "Verwaltung", "gemeinsam", 0, false, "Liniengasse", 4, "hof");
   R("skue", "Schulküche", "Sonstiges", "gemeinsam", 26, false, "Liniengasse", 4, "hof");
   R("hort", "Hort & Tagesbetreuung", "Hort", "Hort", 30, false, "Millergasse", 4, "strasse", 2);
   // 5. OG
   R("r501", "R501", "Klassenraum", "NMS", 26, false, "Liniengasse", 5, "strasse");
   R("r502", "R502", "Klassenraum", "NMS", 26, false, "Liniengasse", 5, "strasse");
+  core(5);
   R("r503", "R503", "Klassenraum", "NMS", 26, false, "Liniengasse", 5, "strasse");
   R("r504", "R504", "Klassenraum", "PTS", 24, false, "Liniengasse", 5, "strasse");
   R("zs", "Zeichensaal", "Sonstiges", "gemeinsam", 26, false, "Liniengasse", 5, "hof");
   R("bes", "Besprechung", "Mehrzweck", "gemeinsam", 12, true, "Liniengasse", 5, "hof");
   R("ts2", "Turnsaal", "Turnsaal", "gemeinsam", 30, false, "Millergasse", 5, "strasse", 2);
   // Dach
-  R("sport", "Sportplatz Dach", "Turnsaal", "gemeinsam", 30, false, "Liniengasse", 6, "strasse", 3);
+  R("sport", "Ballspielplatz", "Turnsaal", "gemeinsam", 30, false, "Liniengasse", 6, "strasse", 3);
+  core(6);
   R("garten", "Dachgarten", "Sonstiges", "gemeinsam", 30, true, "Liniengasse", 6, "hof", 2);
   rooms.sort((a, b) => a.sort - b.sort);
 

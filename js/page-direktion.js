@@ -268,7 +268,7 @@ function renderSettings(box, needsSetup) {
             <td><input data-f="trakt" list="traktList" value="${h(r.trakt || roomPlace(r).trakt)}" style="min-width:110px"></td>
             <td><select data-f="stock">${[-1, 0, 1, 2, 3, 4].map((n) => opt(n, FLOOR_NAMES(n), roomPlace(r).stock === n)).join("")}</select></td>
             <td><select data-f="seite">${opt("", "auto", !r.seite)}${opt("strasse", "Straße", r.seite === "strasse")}${opt("hof", "Hof", r.seite === "hof")}</select></td>
-            <td><input type="number" min="1" max="6" data-f="groesse" value="${h(roomPlace(r).groesse)}"></td>
+            <td><input type="number" min="0.5" max="6" step="0.5" data-f="groesse" value="${h(roomPlace(r).groesse)}"></td>
             <td><input type="number" min="0" data-f="kapazitaet" value="${h(r.kapazitaet ?? "")}"></td>
             <td><input type="checkbox" data-f="notnutzung" ${r.notnutzung ? "checked" : ""}></td>
             <td><button class="icon" data-delroom="${h(r.id)}">✕</button></td></tr>`).join("")}
