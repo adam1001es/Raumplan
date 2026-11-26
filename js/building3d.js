@@ -122,12 +122,12 @@ export async function createBuilding(container, rooms, opts = {}) {
   scene.add(sun);
 
   const world = new THREE.Group(); scene.add(world);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: dark ? 0.25 : 0.07 }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: dark ? 0.15 : 0.035 }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -SLAB; ground.receiveShadow = true; scene.add(ground);
 
   let layout, stacked = false, lastRooms = rooms;
   let meshes = new Map(), floorGroups = new Map();
-  let exploded = false, floorSel = null, selected = null, labelMode = opts.labels || "free";
+  let exploded = false, floorSel = null, selected = null, labelMode = "none";
   const clock = new THREE.Clock(); let introT0 = 0;
   const C = (hex) => new THREE.Color(hex);
   const slabColor = dark ? 0x2b3552 : 0xffffff, corrColor = dark ? 0x323d5e : 0xe9edf4;
@@ -144,10 +144,8 @@ export async function createBuilding(container, rooms, opts = {}) {
       const g = floorGroups.get(s.stock);
       const slab = new THREE.Mesh(new THREE.BoxGeometry(s.w, SLAB, s.d), new THREE.MeshStandardMaterial({ color: slabColor, roughness: 0.85, transparent: true }));
       slab.position.set(s.x, -SLAB / 2, s.z); slab.rotation.y = s.rot; slab.castShadow = true; slab.receiveShadow = true; slab.userData.base = 1; g.add(slab);
-      const edge = new THREE.LineSegments(new THREE.EdgesGeometry(slab.geometry), new THREE.LineBasicMaterial({ color: dark ? 0x4a5677 : 0xcfd6e3, transparent: true }));
-      edge.position.copy(slab.position); edge.rotation.y = s.rot; edge.userData.base = 1; g.add(edge);
-      const corr = new THREE.Mesh(new THREE.PlaneGeometry(s.w - 0.5, CORRIDOR - 0.2), new THREE.MeshStandardMaterial({ color: corrColor, roughness: 1, transparent: true }));
-      corr.rotation.set(-Math.PI / 2, s.rot, 0, "YXZ"); corr.position.set(s.x, 0.005, s.z); corr.userData.base = 1; g.add(corr);
+
+
       if (s.main) {
         const fl = document.createElement("div"); fl.className = "b3d-floor"; fl.textContent = FLOOR_NAMES(s.stock);
         const a = s.w / 2 + 0.5, lz = layout.configured ? -s.d / 2 : s.d / 2;
@@ -168,7 +166,7 @@ export async function createBuilding(container, rooms, opts = {}) {
       tile.position.y = 0.06; tile.receiveShadow = true; tile.castShadow = true; tile.userData.base = 1;
       const glass = new THREE.Mesh(new THREE.BoxGeometry(w, WALL_H, d), new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.15, metalness: 0, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide }));
       glass.position.y = WALL_H / 2; glass.userData.glass = true;
-      const frame = new THREE.LineSegments(new THREE.EdgesGeometry(glass.geometry), new THREE.LineBasicMaterial({ color: dark ? 0x8fa0c8 : 0x9aa8bf, transparent: true, opacity: 0.55 }));
+      const frame = new THREE.LineSegments(new THREE.EdgesGeometry(glass.geometry), new THREE.LineBasicMaterial({ color: dark ? 0x8fa0c8 : 0x9aa8bf, transparent: true, opacity: 0.12 }));
       frame.position.y = WALL_H / 2;
       const mk = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), new THREE.MeshStandardMaterial({ color: 0xe11d74, emissive: 0xe11d74, emissiveIntensity: 0.7 }));
       mk.position.y = WALL_H + 0.45; mk.visible = false;
@@ -182,8 +180,8 @@ export async function createBuilding(container, rooms, opts = {}) {
     }
     for (const f of layout.fill) {
       const g = floorGroups.get(f.stock); if (!g) continue;
-      const box = new THREE.Mesh(new THREE.BoxGeometry(f.w - 0.18, 0.06, f.d - 0.18), new THREE.MeshStandardMaterial({ color: dark ? 0x3a4466 : 0xe3e8f0, roughness: 1, transparent: true, opacity: 0.8 }));
-      box.position.set(f.x, 0.03, f.z); box.rotation.y = f.rot; box.userData.base = 0.8; g.add(box);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(f.w - 0.18, 0.06, f.d - 0.18), new THREE.MeshStandardMaterial({ color: dark ? 0x3a4466 : 0xeef1f6, roughness: 1, transparent: true, opacity: 0.6 }));
+      box.position.set(f.x, 0.03, f.z); box.rotation.y = f.rot; box.userData.base = 0.6; g.add(box);
     }
     applyFloors(true); fit(); introT0 = clock.getElapsedTime();
   }
@@ -202,7 +200,7 @@ export async function createBuilding(container, rooms, opts = {}) {
           if (!o.userData.roof) o.material.depthWrite = f === 1;
         }
         if (o.isCSS2DObject && o.userData.floorLabel) o.element.classList.toggle("dim", dimmed(s));
-        if (o.userData.roof) o.visible = floorSel === null && !exploded;
+        if (o.userData.roof) o.visible = false;
       });
     }
     applyLabels();
@@ -259,15 +257,14 @@ export async function createBuilding(container, rooms, opts = {}) {
       u.tile.material.color.lerp(u.target, 0.1);
       u.glass.material.color.lerp(u.target, 0.1);
       let em = 0;
-      if (u.kind === "admin") em = 0;
-      else if (u.kind === "free") em = 0.25 + 0.2 * Math.sin(t * 2.4 + u.delay * 7);
+      if (u.kind === "free") em = 0.18 + 0.1 * Math.sin(t * 2 + u.delay * 7);
       else if (u.kind === "conflict") em = 0.2 + 0.5 * Math.max(0, Math.sin(t * 6));
       u.tile.material.emissive.copy(u.target); u.tile.material.emissiveIntensity = em;
-      const gBase = sel ? 0.42 : u.kind === "admin" ? 0.3 : u.kind === "busy" ? 0.2 : u.kind === "free" ? 0.12 : 0.16;
+      const gBase = sel ? 0.35 : u.kind === "admin" ? 0.03 : u.kind === "free" ? 0.1 : 0.07;
       u.glass.material.opacity += (gBase * (dim ? 0.12 : 1) - u.glass.material.opacity) * 0.15;
       u.frame.material.color.lerp(sel ? white : u.target, 0.12);
-      u.frame.material.opacity += ((dim ? 0.06 : sel ? 1 : 0.5) - u.frame.material.opacity) * 0.15;
-      u.tile.material.opacity = dim ? 0.12 : 1;
+      u.frame.material.opacity += ((dim ? 0.03 : sel ? 1 : u.kind === "admin" ? 0.06 : 0.14) - u.frame.material.opacity) * 0.15;
+      u.tile.material.opacity = dim ? 0.1 : u.kind === "admin" ? 0.35 : 1;
       m.position.y = sel ? 0.25 + Math.sin(t * 3) * 0.05 : m.position.y * 0.85;
       if (u.mk.visible) { u.mk.rotation.y = t * 2; u.mk.position.y = WALL_H + 0.45 + Math.sin(t * 3) * 0.1; }
     }
@@ -281,7 +278,7 @@ export async function createBuilding(container, rooms, opts = {}) {
     update(states) {
       for (const [id, m] of meshes) {
         const s = states.get(id); if (!s) continue;
-        const u = m.userData; u.target.set(s.color); u.kind = s.kind; u.mk.visible = !!s.changed;
+        const u = m.userData; u.target.set(s.color); u.kind = s.kind; u.mk.visible = false;
         u.el.className = `b3d-lbl k-${s.kind}${selected === id ? " sel" : ""}`;
         u.el.querySelector("b").textContent = s.name;
         u.el.querySelector("span").textContent = s.label;

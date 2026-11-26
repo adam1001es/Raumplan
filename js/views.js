@@ -5,10 +5,7 @@ import { slotState, isBusy, byId, bereichClass, DAY_SHORT, weekday, parseIso, fm
 import { fmtPeriods } from "./parser.js";
 
 export function legendHtml() {
-  return `<div class="legend">
-    <span class="b-nms"><i></i>NMS</span><span class="b-pts"><i></i>PTS</span><span class="b-vs"><i></i>Volksschule</span>
-    <span class="b-hort"><i></i>Hort</span><span class="b-gem"><i></i>Gemeinsam</span>
-    <span><i class="free"></i>frei</span><span><i class="emerg"></i>zur Not nutzbar</span><span><i class="chg"></i>geändert</span></div>`;
+  return `<div class="legend"><span><i class="free"></i>frei</span><span><i class="emerg"></i>frei (nur zur Not)</span><span><i class="busy"></i>besetzt</span><span><i class="chg"></i>geändert</span></div>`;
 }
 
 /** Raumkarten für Datum + Einheit. opts: {filter, search, clickable} */

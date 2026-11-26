@@ -305,8 +305,18 @@ table.edit input[type=number] { max-width: 80px; }
 .s3d-info .now { display: flex; align-items: center; gap: .45rem; margin: .4rem 0; flex-wrap: wrap; }
 .s3d-info .now i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
 .s3d-info .strip { display: flex; gap: 2px; margin-bottom: .5rem; }
-.s3d-info .mini { flex: 1; padding: 0; height: 22px; border-radius: 5px; color: #fff; font-size: .66rem; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,.3); opacity: .7; }
-.s3d-info .mini.on { opacity: 1; outline: 2px solid var(--ink); outline-offset: 1px; }
+.s3d-info .mini { flex: 1; padding: 0; height: 24px; border-radius: 6px; font-size: .66rem; font-weight: 800; background: #8b97ab; color: #fff; }
+.s3d-info .mini.k-free { background: #22c55e; } .s3d-info .mini.k-emerg { background: #a7e8bd; color: #14532d; }
+.s3d-info .mini.k-conflict { background: #ef4444; } .s3d-info .mini.k-admin { background: #dfe3ea; color: var(--muted); }
+.s3d-info .mini.on { outline: 2px solid var(--ink); outline-offset: 1px; }
+.s3d-info .hl { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .2rem; }
+.s3d-info .st { font-size: .74rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: .2rem .55rem; border-radius: 999px; }
+.s3d-info .st.free { background: var(--free-bg); color: var(--free); } .s3d-info .st.busy { background: var(--soft); color: var(--ink); } .s3d-info .st.adm { background: var(--soft); color: var(--muted); }
+.s3d-info .who { font-size: 1.35rem; font-weight: 900; letter-spacing: -.01em; }
+.s3d-info .tm { font-size: 1rem; } .s3d-info .tm small { color: var(--muted); margin-left: .3rem; }
+.s3d-info .why { font-size: .8rem; color: var(--muted); margin-top: .15rem; }
+.s3d-info .after { font-size: .82rem; color: var(--muted); margin: .35rem 0 .55rem; }
+.s3d-legend .hint { color: var(--muted); margin-left: auto; font-style: italic; }
 .s3d-info .edit { width: 100%; padding: .5rem; }
 .s3d-toast { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 9; background: var(--ink); color: var(--card); padding: .5rem .9rem; border-radius: 10px; font-size: .82rem; font-weight: 600; pointer-events: none; animation: pop .2s; }
 
@@ -333,3 +343,10 @@ table.edit input[type=number] { max-width: 80px; }
 .below { margin-top: 1rem; }
 details.more > summary { cursor: pointer; font-weight: 700; padding: .3rem 0; list-style: none; }
 details.more > summary::before { content: "▸ "; } details.more[open] > summary::before { content: "▾ "; }
+
+/* Ruhige Farben: nur frei / besetzt */
+.legend i.busy { background: #8b97ab; }
+.room.busy { background: var(--soft); border-color: var(--line); } .room.busy .g { color: var(--ink); }
+.cell.busy { background: var(--soft); color: var(--ink); font-weight: 600; }
+.where, .where.away { background: var(--soft); } .where b { color: var(--ink); }
+.util-row .b i { background: #8b97ab; }
