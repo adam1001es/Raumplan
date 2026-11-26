@@ -4,9 +4,9 @@ Eine Web-App, mit der die Direktion die Räume der Schule live im Blick hat. Ber
 
 | Seite | Für wen | Was |
 |---|---|---|
-| `index.html` – **Übersicht** | alle Lehrkräfte (nur ansehen) | Wo ist welche Klasse, welche Räume sind jetzt frei, Änderungen von heute |
+| `index.html` – **Übersicht** | alle Lehrkräfte (nur ansehen) | **Animiertes 3D-Schulgebäude**: freie Räume leuchten grün, Stockwerke einzeln ansehbar, Tag abspielen; dazu „Wo ist welche Klasse“ |
 | `aendern.html` – **Ändern** | Direktion, Hort- und VS-Leitung, Bearbeiter | Chat-Eingabe wie in WhatsApp (auch per Sprache), Schnellformular, Rückgängig |
-| `direktion.html` – **Direktion** | nur Master | Live-Monitoring, Wochenraster, Auslastung (Heatmap), Tipps, Einstellungen, Zugänge |
+| `direktion.html` – **Direktion** | nur Master | **Live 3D** mit Tipps (Raum antippen → ändern), Wochenraster, Auslastung (Heatmap), Einstellungen, Zugänge |
 
 ## Beispielsätze
 
@@ -46,7 +46,8 @@ Solange in `js/config.js` nichts eingetragen ist, läuft die App mit Beispieldat
 1. `…/direktion.html` öffnen, auf **Registrieren** tippen und E-Mail und Passwort eingeben. **Die erste Person wird automatisch Master.**
 2. Bestätigungs-E-Mail anklicken und anmelden.
 3. Unter **Einstellungen** auf **Beispieldaten laden** tippen oder gleich die echten Räume, Klassen und Einheiten anlegen.
-4. **Stundenplan schnell füllen** setzt jede Klasse in ihren Stammraum. Danach unter **Woche → Regulärer Stundenplan** Turnsaal, Werkraum usw. antippen.
+4. Bei jedem Raum **Gebäude, Stock und Größe** eintragen, damit das 3D-Gebäude so aussieht wie Ihre Schule.
+5. **Stundenplan schnell füllen** setzt jede Klasse in ihren Stammraum. Danach unter **Woche → Regulärer Stundenplan** Turnsaal, Werkraum usw. antippen.
 
 ### 5. Kolleginnen und Kollegen einladen
 - **Lehrkräfte**: Link zu `index.html` schicken. Ist „Lehrer-Übersicht ohne Anmeldung“ eingeschaltet, brauchen sie kein Konto.
@@ -63,4 +64,4 @@ Solange in `js/config.js` nichts eingetragen ist, läuft die App mit Beispieldat
 | Wartet auf Freigabe | – | – | – |
 
 ## Technik
-Statische Seiten (HTML/JS, kein Build) auf GitHub Pages, dazu Supabase (PostgreSQL mit Row Level Security, Auth und Realtime) für Live-Updates. Lizenzfrei nutzbar für die Schule.
+Statische Seiten (HTML/JS, kein Build, 3D mit three.js lokal eingebunden) auf GitHub Pages, dazu Supabase (PostgreSQL mit Row Level Security, Auth und Realtime) für Live-Updates. Lizenzfrei nutzbar für die Schule.

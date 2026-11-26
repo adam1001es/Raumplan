@@ -8,6 +8,8 @@ import {
 } from "./model.js";
 import { roomCardsHtml, planTableHtml, legendHtml, changeLogHtml } from "./views.js";
 import { computeTips } from "./tips.js";
+import { mountScene } from "./scene3d.js";
+import { roomPlace, FLOOR_NAMES } from "./building3d.js";
 import { fmtPeriods } from "./parser.js";
 
 const { store, gate } = await bootPage({ need: "master", page: "direktion.html" });
@@ -30,12 +32,13 @@ function syncNow() {
 }
 syncNow();
 
-function setTab(t) { st.tab = t; sessionStorage.setItem("dir-tab", t); render(); }
+function setTab(t) { st.tab = t; sessionStorage.setItem("dir-tab", t); liveScene = null; render(); }
 
 function render() {
   if (!gate()) return;
   const d = store.data;
-  const tabs = [["live", "📡 Live"], ["woche", "🗓️ Woche"], ["auslastung", "📊 Auslastung"], ["einstellungen", "⚙️ Einstellungen"]];
+  liveScene = null;
+  const tabs = [["live", "🏫 Live 3D"], ["woche", "🗓️ Woche"], ["auslastung", "📊 Auslastung"], ["einstellungen", "⚙️ Einstellungen"]];
   const needsSetup = !d.rooms.length;
   if (needsSetup && st.tab !== "einstellungen") st.tab = "einstellungen";
   app.innerHTML = `<div class="tabs">${tabs.map(([k, l]) => `<button class="${st.tab === k ? "on" : ""}" data-tab="${k}">${l}</button>`).join("")}</div><div id="tab"></div>`;
@@ -47,66 +50,37 @@ function render() {
   else renderSettings(box, needsSetup);
 }
 
-// ── LIVE ───────────────────────────────────────────────────────
-function renderLive(box) {
-  const d = store.data;
-  const now = new Date();
-  const date = parseIso(st.iso);
-  const isToday = st.iso === isoDate(now);
-  const cp = currentPeriod(d.settings.periods, now);
-  const isNow = isToday && cp.status === "jetzt" && cp.nr === st.period;
-  const per = d.settings.periods.find((p) => p.nr === st.period);
-  const slot = slotState(d, st.iso, st.period);
-  const regular = d.rooms.filter((r) => !r.notnutzung);
-  const busy = regular.filter((r) => isBusy(slot.get(r.id))).length;
-  const pct = regular.length ? Math.round((busy / regular.length) * 100) : 0;
-  const mon = mondayOf(schoolToday(now));
-  const weekChanges = d.changes.filter((c) => c.datum >= isoDate(mon) && c.datum <= isoDate(addDays(mon, 4)) && c.art !== "info");
-  const tips = computeTips(d, now);
-  const weekDays = [1, 2, 3, 4, 5].map((wd) => addDays(mon, wd - 1));
+// ── LIVE (3D) ──────────────────────────────────────────────────
+let liveScene = null;
+async function renderLive(box) {
+  box.innerHTML = `<div id="scene"></div><div class="grid2 below" id="livePanels"></div>`;
+  const myBox = box;
+  const sc = await mountScene($("#scene", box), store, {
+    canEdit: () => true,
+    onEdit: (roomId, iso, period) => openSlotSheet(roomId, iso, period),
+    onSel: (sel) => { st.iso = sel.iso; st.period = sel.period; st.follow = sel.follow; renderLivePanels(); },
+  });
+  if (!myBox.isConnected) return;
+  liveScene = sc;
+  if (!st.follow && st.iso) sc.setSel(st.iso, st.period);
+  renderLivePanels();
+}
 
+function renderLivePanels() {
+  const box = $("#livePanels"); if (!box) return;
+  const d = store.data;
+  const tips = computeTips(d, new Date());
+  const openList = $("#roomList")?.open;
   box.innerHTML = `
-    <div class="now-head">
-      <div>
-        <div class="t">${isNow ? "● Live – jetzt" : isToday ? "Heute" : DAY_NAMES[weekday(date)]}</div>
-        <div class="p">${DAY_SHORT[weekday(date)]} ${fmtDate(date)} · ${per ? `${per.nr}. EH ${per.start}–${per.end}` : ""}</div>
-      </div>
-      <div class="row gap wrap">
-        <select id="lDay" style="width:auto">${weekDays.map((dd) => `<option value="${isoDate(dd)}" ${isoDate(dd) === st.iso ? "selected" : ""}>${DAY_SHORT[weekday(dd)]} ${fmtDate(dd)}</option>`).join("")}</select>
-        <select id="lPer" style="width:auto">${d.settings.periods.map((p) => `<option value="${p.nr}" ${p.nr === st.period ? "selected" : ""}>${p.nr}. EH ${p.start}</option>`).join("")}</select>
-        ${!st.follow ? `<button class="small" id="lNow">Jetzt</button>` : ""}
-        <div class="clock">${now.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })}</div>
-      </div>
+    <div>
+      <div class="card pad"><h2>💡 Tipps</h2><div class="tips">${tips.map((t) => `<div class="tip ${t.level}"><div class="i">${t.icon}</div><div><b>${h(t.title)}</b><span>${h(t.text)}</span></div></div>`).join("") || `<p class="muted">Alles im grünen Bereich.</p>`}</div></div>
+      <details class="card pad more" id="roomList" style="margin-top:1rem" ${openList ? "open" : ""}><summary>Räume als Liste (${DAY_SHORT[weekday(parseIso(st.iso))]} ${st.period}. EH)</summary>
+        <div style="margin-top:.6rem" id="lCards">${roomCardsHtml(d, st.iso, st.period, { clickable: true })}</div></details>
     </div>
-    <div class="kpis">
-      <div class="card kpi"><div class="l">Auslastung</div><div class="v">${pct} %</div><div class="bar"><i style="width:${pct}%"></i></div></div>
-      <div class="card kpi"><div class="l">Belegt</div><div class="v">${busy}<small> / ${regular.length}</small></div></div>
-      <div class="card kpi"><div class="l">Frei</div><div class="v" style="color:var(--free)">${regular.length - busy}</div><div class="l">+ ${d.rooms.filter((r) => r.notnutzung && !isBusy(slot.get(r.id))).length} zur Not</div></div>
-      <div class="card kpi"><div class="l">Änderungen diese Woche</div><div class="v">${new Set(weekChanges.map((c) => c.text + c.datum)).size}</div></div>
-    </div>
-    <div class="grid2">
-      <div>
-        <div class="filter-row">
-          <div class="chips" id="lFilter">${["alle", "frei", "NMS", "PTS", "VS", "Hort"].map((f) => `<button class="chip ${f === st.filter ? "on" : ""}" data-f="${f}">${f === "alle" ? "Alle" : f === "frei" ? "Nur frei" : f}</button>`).join("")}</div>
-          <input id="lSearch" placeholder="Raum / Klasse suchen" value="${h(st.search)}">
-        </div>
-        <div id="lCards">${roomCardsHtml(d, st.iso, st.period, { filter: st.filter, search: st.search, clickable: true })}</div>
-        <div style="margin-top:.8rem">${legendHtml()}</div>
-        <p class="muted" style="font-size:.8rem">Tipp: Raum antippen, um ihn für diese Einheit zu ändern.</p>
-      </div>
-      <div>
-        <div class="card pad"><h2>💡 Tipps</h2><div class="tips">${tips.map((t) => `<div class="tip ${t.level}"><div class="i">${t.icon}</div><div><b>${h(t.title)}</b><span>${h(t.text)}</span></div></div>`).join("") || `<p class="muted">Alles im grünen Bereich.</p>`}</div></div>
-        <div class="card pad" style="margin-top:1rem"><div class="row between"><h2>🕑 Letzte Änderungen</h2><a href="aendern.html" class="btn small">✏️ Ändern</a></div><div id="lLog">${changeLogHtml(d, d.changes, { limit: 8, canDelete: () => true })}</div></div>
-      </div>
+    <div>
+      <div class="card pad"><div class="row between"><h2>🕑 Letzte Änderungen</h2><a href="aendern.html" class="btn small">✏️ Ändern</a></div>${changeLogHtml(d, d.changes, { limit: 10, canDelete: () => true })}</div>
     </div>`;
-  $("#lDay").onchange = (e) => { st.iso = e.target.value; st.follow = false; render(); };
-  $("#lPer").onchange = (e) => { st.period = +e.target.value; st.follow = false; render(); };
-  $("#lNow")?.addEventListener("click", () => { st.follow = true; syncNow(); render(); });
-  $$("#lFilter .chip").forEach((b) => b.onclick = () => { st.filter = b.dataset.f; render(); });
-  const s = $("#lSearch");
-  s.oninput = () => { st.search = s.value; $("#lCards").innerHTML = roomCardsHtml(store.data, st.iso, st.period, { filter: st.filter, search: st.search, clickable: true }); bindCards(); };
-  const bindCards = () => $$("#lCards .room").forEach((el) => el.onclick = () => openSlotSheet(el.dataset.room, st.iso, st.period));
-  bindCards();
+  $$("#lCards .room", box).forEach((el) => el.onclick = () => openSlotSheet(el.dataset.room, st.iso, st.period));
   bindDeletes(box);
 }
 
@@ -286,16 +260,20 @@ function renderSettings(box, needsSetup) {
 
       <div class="card pad">
         <div class="row between"><h2>🚪 Räume <small>(${d.rooms.length})</small></h2><button class="ghost small" id="addRoom">+ Raum</button></div>
-        <div class="table-scroll"><table class="edit"><thead><tr><th>Name</th><th>Art</th><th>Bereich</th><th>Plätze</th><th title="Nur im Notfall nutzbar">Notfall</th><th></th></tr></thead><tbody>
+        <div class="table-scroll"><table class="edit"><thead><tr><th>Name</th><th>Art</th><th>Bereich</th><th>Gebäude</th><th>Stock</th><th title="Breite im 3D-Plan (1 = normaler Raum)">Größe</th><th>Plätze</th><th title="Nur im Notfall nutzbar">Notfall</th><th></th></tr></thead><tbody>
           ${d.rooms.map((r) => `<tr data-rid="${h(r.id)}">
             <td><input data-f="name" value="${h(r.name)}"></td>
             <td><select data-f="typ">${ROOM_TYPES.map((t) => opt(t, t, r.typ === t)).join("")}</select></td>
             <td><select data-f="bereich">${BEREICHE.map((b) => opt(b, b, r.bereich === b)).join("")}</select></td>
+            <td><input data-f="trakt" list="traktList" value="${h(r.trakt || roomPlace(r).trakt)}" style="min-width:110px"></td>
+            <td><select data-f="stock">${[-1, 0, 1, 2, 3, 4].map((n) => opt(n, FLOOR_NAMES(n), roomPlace(r).stock === n)).join("")}</select></td>
+            <td><input type="number" min="1" max="6" data-f="groesse" value="${h(roomPlace(r).groesse)}"></td>
             <td><input type="number" min="0" data-f="kapazitaet" value="${h(r.kapazitaet ?? "")}"></td>
             <td><input type="checkbox" data-f="notnutzung" ${r.notnutzung ? "checked" : ""}></td>
             <td><button class="icon" data-delroom="${h(r.id)}">✕</button></td></tr>`).join("")}
         </tbody></table></div>
-        <p class="muted" style="font-size:.78rem">Änderungen werden beim Verlassen des Feldes gespeichert. „Notfall“ = Raum wird als „zur Not nutzbar“ vorgeschlagen (z.B. Aula, Bibliothek).</p>
+        <datalist id="traktList">${[...new Set(d.rooms.map((r) => roomPlace(r).trakt))].map((t) => `<option value="${h(t)}">`).join("")}</datalist>
+        <p class="muted" style="font-size:.78rem"><b>Gebäude / Stock / Größe</b> bestimmen, wo der Raum im 3D-Gebäude steht (Größe 2–3 z.B. für Turnsaal oder Aula). Änderungen werden beim Verlassen des Feldes gespeichert. „Notfall“ = Raum wird als „zur Not nutzbar“ vorgeschlagen (z.B. Aula, Bibliothek).</p>
       </div>
 
       <div class="card pad">
@@ -355,7 +333,7 @@ function renderSettings(box, needsSetup) {
   // Räume & Klassen
   $$("tr[data-rid] [data-f]").forEach((el) => el.onchange = () => {
     const tr = el.closest("tr"); const r = store.data.rooms.find((x) => x.id === tr.dataset.rid);
-    const v = el.type === "checkbox" ? el.checked : el.type === "number" ? +el.value : el.value;
+    const v = el.type === "checkbox" ? el.checked : (el.type === "number" || el.dataset.f === "stock") ? +el.value : el.value;
     run(() => store.upsert("rooms", { ...r, [el.dataset.f]: v }));
   });
   $$("tr[data-gid] [data-f]").forEach((el) => el.onchange = () => {
@@ -403,10 +381,9 @@ function renderSettings(box, needsSetup) {
 
 store.onChange(() => {
   const a = document.activeElement;
+  if (st.tab === "live" && liveScene) { liveScene.refresh(); renderLivePanels(); return; }
   if (st.tab === "einstellungen" && a && ["INPUT", "SELECT"].includes(a.tagName) && a.id !== "import") return; // nicht beim Tippen neu zeichnen
-  const focusSearch = a?.id === "lSearch";
   render();
-  if (focusSearch) { const s = $("#lSearch"); s?.focus(); s?.setSelectionRange(s.value.length, s.value.length); }
 });
-everyMinute(() => { if (st.follow) syncNow(); if (st.tab === "live" && document.activeElement?.id !== "lSearch" && !$(".modal-bg")) render(); });
+everyMinute(() => { if (st.tab === "live" && liveScene) { liveScene.tick(); renderLivePanels(); } });
 render();

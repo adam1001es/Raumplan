@@ -18,8 +18,15 @@ create table if not exists public.rooms (
   bereich text default 'gemeinsam',
   kapazitaet int default 25,
   notnutzung boolean default false,
-  sort int default 0
+  sort int default 0,
+  trakt text default '',
+  stock int,
+  groesse int default 1
 );
+-- (für bereits angelegte Datenbanken)
+alter table public.rooms add column if not exists trakt text default '';
+alter table public.rooms add column if not exists stock int;
+alter table public.rooms add column if not exists groesse int default 1;
 
 create table if not exists public.groups (
   id uuid primary key default gen_random_uuid(),

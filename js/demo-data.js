@@ -27,7 +27,7 @@ export function buildDemoData() {
   const rand = rng(42);
   const rooms = [];
   const add = (id, name, typ, bereich, kapazitaet, notnutzung = false) =>
-    rooms.push({ id, name, typ, bereich, kapazitaet, notnutzung, sort: rooms.length });
+    rooms.push({ id, name, typ, bereich, kapazitaet, notnutzung, sort: rooms.length, trakt: "", stock: null, groesse: null });
 
   ["1a", "1b", "2a", "2b", "3a", "3b", "4a", "4b"].forEach((k, i) =>
     add(`r${i + 1}`, `R${String(i + 1).padStart(2, "0")}`, "Klassenraum", "NMS", 26));
@@ -46,6 +46,15 @@ export function buildDemoData() {
   add("bib", "Bibliothek", "Bibliothek", "gemeinsam", 20, true);
   add("aula", "Aula", "Mehrzweck", "gemeinsam", 80, true);
   add("sp", "Speisesaal", "Speisesaal", "gemeinsam", 60, true);
+
+  // Lage im Gebäude
+  const where = {
+    ts: ["Haupthaus", 0, 3], wr: ["Haupthaus", 0], sp: ["Haupthaus", 0, 2], aula: ["Haupthaus", 0, 2],
+    r1: ["Haupthaus", 1], r2: ["Haupthaus", 1], r3: ["Haupthaus", 1], r4: ["Haupthaus", 1], r5: ["Haupthaus", 1], r6: ["Haupthaus", 1], edv: ["Haupthaus", 1],
+    r7: ["Haupthaus", 2], r8: ["Haupthaus", 2], r9: ["Haupthaus", 2], r10: ["Haupthaus", 2], mu: ["Haupthaus", 2], bib: ["Haupthaus", 2],
+    h1: ["VS-Trakt", 0], h2: ["VS-Trakt", 0], r11: ["VS-Trakt", 0], r12: ["VS-Trakt", 1], r13: ["VS-Trakt", 1], r14: ["VS-Trakt", 1],
+  };
+  for (const r of rooms) { const w = where[r.id]; if (w) { r.trakt = w[0]; r.stock = w[1]; r.groesse = w[2] || 1; } }
 
   const groups = [];
   const g = (id, name, bereich, stammraum, schueler) =>

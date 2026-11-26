@@ -4,7 +4,7 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { buildDemoData, DEFAULT_PERIODS } from "./demo-data.js";
 
-const DEMO_KEY = "raumplan-demo-v1";
+const DEMO_KEY = "raumplan-demo-v2";
 const DEMO_USER_KEY = "raumplan-demo-user";
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `id${Date.now()}${Math.random().toString(16).slice(2)}`);
 
